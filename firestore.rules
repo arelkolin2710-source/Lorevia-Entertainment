@@ -1,0 +1,16 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Situs ini tidak memakai login, jadi semua orang yang membuka situs boleh membaca/menulis
+    // koleksi di bawah (pengunjung perlu menulis: pendaftaran, guest box, pesanan, komentar, like).
+    // Hanya koleksi yang dipakai situs yang diizinkan; koleksi lain ditolak.
+    match /{col}/{docId} {
+      allow read, write: if col in [
+        'settings', 'announcements', 'achievements', 'adminStructure', 'members',
+        'managementList', 'traineeSubmissions', 'managementSubmissions', 'guestBoxes',
+        'products', 'orders', 'promos', 'videoPlaylists', 'audioPlaylists', 'videos', 'audios', 'forms', 'slotUsage'
+      ];
+    }
+  }
+}
