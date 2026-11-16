@@ -777,7 +777,7 @@ async function kirimKeSheet(type, data) {
 
         window.addEventListener('beforeunload', persistState);
 
-        const ROUTE_TITLES = {"beranda": "Lorevia Entertainment", "gen-members": "Member Generasi - Lorevia Entertainment", "pendaftaran-trainee": "Pendaftaran Trainee - Lorevia Entertainment", "pendaftaran-management": "Pendaftaran management - Lorevia Entertainment", "cek-hasil": "Cek Hasil Seleksi - Lorevia Entertainment", "about": "About - Lorevia Entertainment", "member": "Member - Lorevia Entertainment", "toko": "Toko - Lorevia Entertainment", "checkout": "Checkout - Lorevia Entertainment", "pengumuman": "Pengumuman - Lorevia Entertainment", "achievement": "Achievement - Lorevia Entertainment", "struktur": "Struktur Admin - Lorevia Entertainment", "guestbox": "Guest Box - Lorevia Entertainment", "video-playlist": "Video Playlist - Lorevia Entertainment", "audio-playlist": "Audio Playlist - Lorevia Entertainment", "admin-dashboard": "Dasbor Admin - Lorevia Entertainment"};
+        const ROUTE_TITLES = {"beranda": "Lorevia Entertainment 🌿 | Agensi Terbaik di RVN Sepanjang Masa", "gen-members": "Member Generasi - Lorevia Entertainment", "pendaftaran-trainee": "Pendaftaran Trainee - Lorevia Entertainment", "pendaftaran-management": "Pendaftaran management - Lorevia Entertainment", "cek-hasil": "Cek Hasil Seleksi - Lorevia Entertainment", "about": "About - Lorevia Entertainment", "member": "Member - Lorevia Entertainment", "toko": "Toko - Lorevia Entertainment", "checkout": "Checkout - Lorevia Entertainment", "pengumuman": "Pengumuman - Lorevia Entertainment", "achievement": "Achievement - Lorevia Entertainment", "struktur": "Struktur Admin - Lorevia Entertainment", "guestbox": "Guest Box - Lorevia Entertainment", "video-playlist": "Video Playlist - Lorevia Entertainment", "audio-playlist": "Audio Playlist - Lorevia Entertainment", "admin-dashboard": "Dasbor Admin - Lorevia Entertainment"};
 
         let currentRoute = window.PAGE_ROUTE || 'beranda';
         // Akses admin: buka  situs.com/#loreviaadmin  (tanpa sandi). Status disimpan di sessionStorage
@@ -866,11 +866,21 @@ async function kirimKeSheet(type, data) {
             return showRoute(route, true);
         }
 
+        // Perbarui alamat kanonik & robots sesuai halaman (dasbor admin tidak boleh diindeks)
+        const SITE_URL = 'https://lorevia-ent-web.vercel.app/';
+        function updateSeoTags(route) {
+            const canon = document.querySelector('link[rel="canonical"]');
+            if (canon) canon.setAttribute('href', route === 'beranda' || route === 'admin-dashboard' ? SITE_URL : SITE_URL + '?p=' + route);
+            const robots = document.querySelector('meta[name="robots"]');
+            if (robots) robots.setAttribute('content', route === 'admin-dashboard' ? 'noindex, nofollow' : 'index, follow, max-image-preview:large');
+        }
+
         // Pindah halaman tanpa memuat ulang situs (satu halaman, banyak tampilan)
         async function showRoute(route, push) {
             currentRoute = route;
             window.PAGE_ROUTE = route;
             document.title = ROUTE_TITLES[route] || 'Lorevia Entertainment';
+            updateSeoTags(route);
             document.documentElement.classList.toggle('protect-content', route !== 'admin-dashboard');
             if (route !== 'toko') stopPromoBanner();
             if (push) {
@@ -2692,6 +2702,7 @@ function toggleMemberGroupName() {
                 history.replaceState(null, '', location.pathname);
             }
             document.title = ROUTE_TITLES[currentRoute] || 'Lorevia Entertainment';
+            updateSeoTags(currentRoute);
             document.documentElement.classList.toggle('protect-content', currentRoute !== 'admin-dashboard');
             if (currentRoute === 'pendaftaran-trainee' && !appData.registrationOpen.trainee) {
                 alert('Maaf pendaftaran telah tutup, see you next time!');
@@ -2951,16 +2962,16 @@ function toggleMemberGroupName() {
         const SOCIAL_LINKS = [
             {
                 name: 'YouTube',
-                handle: '@loreviaentoffc',
-                url: 'https://youtube.com/@loreviaentoffc?si=e1Y-AH60QbiLehur',
+                handle: '@lorevia.ent.official.channel',
+                url: 'https://youtube.com/@lorevia.ent.official.channel?si=3s4oM5k9tyOa0Bzv',
                 desc: 'Nonton MV, behind the scene, dan konten video lainnya.',
                 accent: '#FF0033',
                 icon: '<path d="M23.5 6.2a3 3 0 0 0-2.1-2.1C19.5 3.5 12 3.5 12 3.5s-7.5 0-9.4.6A3 3 0 0 0 .5 6.2 31.6 31.6 0 0 0 0 12a31.6 31.6 0 0 0 .5 5.8 3 3 0 0 0 2.1 2.1c1.9.6 9.4.6 9.4.6s7.5 0 9.4-.6a3 3 0 0 0 2.1-2.1A31.6 31.6 0 0 0 24 12a31.6 31.6 0 0 0-.5-5.8ZM9.6 15.5V8.5l6.3 3.5-6.3 3.5Z"/>'
             },
             {
                 name: 'TikTok',
-                handle: '@loreviaentertainment26',
-                url: 'https://www.tiktok.com/@loreviaentertainment26?_r=1&_t=ZS-99rQy93hmlx',
+                handle: '@lorevia.ent.offc.tiktok',
+                url: 'https://tiktok.com/@lorevia.ent.offc.tiktok',
                 desc: 'Update harian, teaser, dan momen seru dari balik layar.',
                 accent: '#25F4EE',
                 icon: '<path d="M16.6 5.8a4.6 4.6 0 0 1-3.8-4.1h-3.2v14.6a2.6 2.6 0 1 1-1.8-2.5V10.5a5.8 5.8 0 1 0 5 5.8V9.7a7.8 7.8 0 0 0 4.5 1.4V7.9a4.6 4.6 0 0 1-.7-2.1Z"/>'
@@ -3002,10 +3013,30 @@ function toggleMemberGroupName() {
                     <div class="text-center space-y-3">
                         <h1 class="font-serif text-3xl md:text-4xl font-bold gold-text">Tentang Kami</h1>
                         <p class="text-gray-300 text-sm md:text-base leading-relaxed">
-                            <span class="font-semibold text-gold-400">Lorevia Entertainment</span> adalah agensi hiburan yang berfokus
-                            mencetak talenta muda di bidang vokal, rap, dan dance. Kami percaya setiap trainee punya potensi untuk
+                            <span class="font-semibold text-gold-400">Lorevia Entertainment</span> 🌿 adalah agensi hiburan bertema tropis
+                            di RVN yang berfokus mencetak talenta muda di bidang vokal, rap, dan dance. Suasana hutan tropis yang hangat,
+                            hijau, dan penuh warna menjadi identitas kami. Kami percaya setiap trainee punya potensi untuk
                             berkembang menjadi entertainer profesional lewat bimbingan, latihan, dan panggung yang tepat.
                         </p>
+                        <p class="text-gray-300 text-sm md:text-base leading-relaxed">
+                            Lorevia Entertainment didirikan oleh <span class="font-semibold text-gold-400">Ranny Carnita Larisadrich</span>
+                            (Founder) bersama <span class="font-semibold text-gold-400">Abella</span> (Co-Founder).
+                            Website resmi ini dibuat oleh Ranny.
+                        </p>
+                        <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2 text-left">
+                            <div class="bg-forest-800/60 gold-border rounded-xl p-3">
+                                <p class="text-[11px] uppercase tracking-wide text-gray-400">Founder</p>
+                                <p class="font-serif font-bold text-gold-400 text-sm">Ranny Carnita Larisadrich</p>
+                            </div>
+                            <div class="bg-forest-800/60 gold-border rounded-xl p-3">
+                                <p class="text-[11px] uppercase tracking-wide text-gray-400">Co-Founder</p>
+                                <p class="font-serif font-bold text-gold-400 text-sm">Abella</p>
+                            </div>
+                            <div class="bg-forest-800/60 gold-border rounded-xl p-3">
+                                <p class="text-[11px] uppercase tracking-wide text-gray-400">Pembuat Website</p>
+                                <p class="font-serif font-bold text-gold-400 text-sm">Ranny</p>
+                            </div>
+                        </div>
                     </div>
 
                     <div class="bg-forest-800/40 gold-border rounded-2xl p-6 md:p-8 space-y-4">
@@ -3122,6 +3153,14 @@ function toggleMemberGroupName() {
                             <button onclick="navigate('checkout')" class="px-5 py-2.5 rounded-xl bg-forest-800 gold-border text-gold-400 font-semibold hover:bg-forest-700 transition whitespace-nowrap">
                                 Keranjang (${cart.reduce((a,c)=>a+c.qty,0)})
                             </button>
+                        </div>
+                        <div class="flex flex-col sm:flex-row items-center justify-between gap-3 bg-forest-800/60 gold-border rounded-2xl p-4">
+                            <div class="text-center sm:text-left">
+                                <p class="text-sm font-semibold text-gold-400">Pesan lewat Founder</p>
+                                <p class="text-xs text-gray-300">Ada pertanyaan soal produk atau pesanan? Hubungi langsung lewat WhatsApp: <span class="font-semibold">0851-4167-9594</span></p>
+                            </div>
+                            <a href="https://wa.me/6285141679594?text=Halo%20Lorevia%20Entertainment%2C%20saya%20ingin%20bertanya%20soal%20produk%20di%20toko." target="_blank" rel="noopener noreferrer"
+                               class="px-5 py-2.5 rounded-xl bg-gold-600 hover:bg-gold-500 text-black font-bold text-sm transition whitespace-nowrap">Chat WhatsApp Founder</a>
                         </div>
                         ${(() => {
                             const activePromos = getActivePromos();
@@ -3253,7 +3292,7 @@ function toggleMemberGroupName() {
                         <div class="bg-forest-800/70 rounded-2xl gold-border p-5 space-y-4 text-center">
                             <h3 class="font-serif text-xl font-bold text-gold-400">Scan Untuk Bayar</h3>
                             <img src="${PAYMENT_QR_IMG}" alt="QR Pembayaran" class="w-56 h-56 mx-auto rounded-xl border-2 border-gold-600 object-cover">
-                            <p class="text-sm text-gray-300">Setelah transfer sesuai total di atas, kasi bukti ss payment nya yaa lewat kontak admin kami! Pesanan diproses setelah bukti pembayaran diterima.</p>
+                            <p class="text-sm text-gray-300">Setelah transfer sesuai total di atas, kasi bukti ss payment nya yaa lewat WhatsApp Founder: <a href="https://wa.me/6285141679594" target="_blank" rel="noopener noreferrer" class="underline text-gold-400 font-semibold">0851-4167-9594</a>! Pesanan diproses setelah bukti pembayaran diterima.</p>
                         </div>
 
                         <form onsubmit="submitOrder(event)" class="bg-forest-800/70 rounded-2xl gold-border p-5 space-y-3">
@@ -3721,108 +3760,178 @@ async function loadAudioPlaylistData() {
 // ======== Halaman: admin-dashboard ========
 // Tampilan halaman "Dasbor Admin - Lorevia Entertainment" (route: admin-dashboard).
 // Markup disalin apa adanya dari versi satu file.
-        // ===== Tab "Form Pendaftaran": atur kolom, divisi, slot, wajib/opsional =====
+        // ===== Tab "Form Pendaftaran": panel pengaturan formulir (divisi, slot, kolom, wajib/opsional) =====
         const FIELD_TYPE_LABEL = {
             text: 'Teks singkat', textarea: 'Paragraf', date: 'Tanggal', number: 'Angka',
             select: 'Pilihan (dropdown)', checkbox: 'Kotak centang', file: 'Unggah file', division: 'Pilihan divisi'
         };
-        function renderFormBuilder(type, title) {
+        const FIELD_TYPE_ICON = { text: 'Aa', textarea: '¶', date: '31', number: '#', select: '▾', checkbox: '☑', file: '⇪', division: '◈' };
+        let formBuilderType = 'trainee';
+        let formOpenField = null;
+
+        function setFormBuilderType(t) { formBuilderType = t; formOpenField = null; renderView(); }
+        function toggleFormField(id) { formOpenField = formOpenField === id ? null : id; renderView(); }
+
+        function uiSwitch(checked, onchange, disabled, label) {
+            return `<label class="inline-flex items-center gap-2 ${disabled ? 'opacity-50' : 'cursor-pointer'}">
+                <input type="checkbox" class="sr-only peer" ${checked ? 'checked' : ''} ${disabled ? 'disabled' : ''} onchange="${onchange}">
+                <span class="relative w-9 h-5 rounded-full bg-forest-600 peer-checked:bg-gold-500 transition after:content-[''] after:absolute after:top-0.5 after:left-0.5 after:w-4 after:h-4 after:rounded-full after:bg-white after:transition-all peer-checked:after:translate-x-4"></span>
+                ${label ? `<span class="text-xs text-gray-200">${label}</span>` : ''}
+            </label>`;
+        }
+
+        function renderFormBuilder(type) {
             const form = getForm(type);
-            const inp = 'px-3 py-2 rounded-lg bg-forest-900 border border-forest-600 text-white text-sm outline-none focus:border-gold-500';
+            const inp = 'px-3 py-2 rounded-lg bg-forest-900 border border-forest-600 text-white text-sm outline-none focus:border-gold-500 w-full';
+            const open = !!appData.registrationOpen[type];
+            const list = type === 'trainee' ? appData.traineeSubmissions : appData.managementSubmissions;
+            const totalSlots = form.divisions.reduce((a, d) => a + (parseInt(d.slots, 10) || 0), 0);
+            const totalUsed = form.divisions.reduce((a, d) => a + getSlotUsed(type, d.name), 0);
+            const reqCount = form.fields.filter(f => f.required).length;
+
+            const stat = (label, value, sub, tone) => `
+                <div class="bg-forest-900/70 border border-forest-700 rounded-xl p-4">
+                    <p class="text-[11px] uppercase tracking-wide text-gray-400">${label}</p>
+                    <p class="font-serif text-2xl font-bold ${tone || 'text-gold-400'} mt-1">${value}</p>
+                    <p class="text-[11px] text-gray-400 mt-0.5">${sub}</p>
+                </div>`;
+
             const divRows = form.divisions.map(d => {
                 const used = getSlotUsed(type, d.name);
                 const slots = parseInt(d.slots, 10) || 0;
+                const pct = slots ? Math.min(100, Math.round(used / slots * 100)) : 0;
                 return `
-                <div class="flex flex-wrap items-center gap-2 bg-forest-900/70 p-3 rounded-xl border border-forest-700">
-                    <input type="text" value="${escHtml(d.name)}" onchange="formEditDivision('${type}', '${d.id}', 'name', this.value)" class="${inp} flex-1 min-w-[8rem]" aria-label="Nama divisi">
-                    <label class="text-xs text-gray-300 flex items-center gap-1">Slot
-                        <input type="number" min="0" value="${slots}" onchange="formEditDivision('${type}', '${d.id}', 'slots', this.value)" class="${inp} w-20" aria-label="Jumlah slot">
-                    </label>
-                    <span class="text-xs ${slots && used >= slots ? 'text-red-400' : 'text-gray-400'}">${slots ? `terpakai ${used}/${slots}` : `terpakai ${used} · tanpa batas`}</span>
-                    <button type="button" onclick="formDeleteDivision('${type}', '${d.id}')" class="px-2.5 py-1.5 rounded-lg bg-red-600/20 hover:bg-red-600/40 text-red-400 text-xs font-semibold border border-red-600/40">Hapus</button>
-                </div>`;
+                <tr class="border-t border-forest-700">
+                    <td class="py-2 pr-2"><input type="text" value="${escHtml(d.name)}" onchange="formEditDivision('${type}', '${d.id}', 'name', this.value)" class="${inp}" aria-label="Nama divisi"></td>
+                    <td class="py-2 pr-2 w-24"><input type="number" min="0" value="${slots}" onchange="formEditDivision('${type}', '${d.id}', 'slots', this.value)" class="${inp}" aria-label="Jumlah slot"></td>
+                    <td class="py-2 pr-2 min-w-[8rem]">
+                        <div class="flex items-center gap-2">
+                            <div class="flex-1 h-2 rounded-full bg-forest-700 overflow-hidden"><div class="h-full ${pct >= 100 ? 'bg-red-500' : 'bg-gold-500'}" style="width:${slots ? pct : 0}%"></div></div>
+                            <span class="text-[11px] ${slots && used >= slots ? 'text-red-400' : 'text-gray-300'} whitespace-nowrap">${slots ? `${used}/${slots}` : `${used} · ∞`}</span>
+                        </div>
+                    </td>
+                    <td class="py-2 text-right"><button type="button" onclick="formDeleteDivision('${type}', '${d.id}')" class="px-2.5 py-1.5 rounded-lg bg-red-600/15 hover:bg-red-600/35 text-red-400 text-xs font-semibold border border-red-600/40">Hapus</button></td>
+                </tr>`;
             }).join('');
 
-            const fieldRows = form.fields.map((f, i) => {
+            const fieldCards = form.fields.map((f, i) => {
                 const sys = !!f.sys;
                 const lockedReq = f.sys === 'name' || f.sys === 'tanggalLahir' || f.sys === 'division';
-                const typeSel = sys
-                    ? `<span class="${inp} text-gray-300 bg-forest-800">${FIELD_TYPE_LABEL[f.type]}</span>`
-                    : `<select onchange="formEditField('${type}', '${f.id}', 'type', this.value, true)" class="${inp}" aria-label="Jenis kolom">
-                        ${['text','textarea','date','number','select','checkbox','file'].map(k => `<option value="${k}" ${f.type === k ? 'selected' : ''}>${FIELD_TYPE_LABEL[k]}</option>`).join('')}
-                       </select>`;
-                let extra = '';
-                if (f.type === 'select' || f.type === 'checkbox') {
-                    extra += `<label class="block text-[11px] text-gray-400 mt-2">${f.type === 'checkbox' ? 'Opsi centang (satu per baris; kosongkan = satu kotak persetujuan)' : 'Opsi pilihan (satu per baris)'}
-                        <textarea rows="3" onchange="formEditField('${type}', '${f.id}', 'options', this.value)" class="${inp} w-full mt-1">${escHtml((f.options || []).join('\n'))}</textarea></label>`;
-                }
-                if (f.type === 'file') {
-                    extra += `<div class="mt-2 text-[11px] text-gray-400">Jenis file yang boleh diunggah (maks. ${MAX_FILE_KB} KB per file):
-                        <div class="flex flex-wrap gap-3 mt-1 text-xs text-gray-200">
-                        ${Object.keys(FILE_KINDS).map(k => `<label class="flex items-center gap-1"><input type="checkbox" class="accent-yellow-500" ${(f.fileKinds || []).includes(k) ? 'checked' : ''} onchange="formToggleKind('${type}', '${f.id}', '${k}', this.checked)"> ${FILE_KINDS[k].label}</label>`).join('')}
-                        </div></div>`;
-                }
-                if (f.type !== 'division' && form.divisions.length) {
-                    extra += `<div class="mt-2 text-[11px] text-gray-400">Tampil hanya untuk divisi (tidak dicentang = semua divisi):
-                        <div class="flex flex-wrap gap-3 mt-1 text-xs text-gray-200">
-                        ${form.divisions.map(d => `<label class="flex items-center gap-1"><input type="checkbox" class="accent-yellow-500" ${(f.divisions || []).includes(d.name) ? 'checked' : ''} onchange="formToggleFieldDivision('${type}', '${f.id}', '${escHtml(d.name).replace(/'/g, '&#39;')}', this.checked)"> ${escHtml(d.name)}</label>`).join('')}
-                        </div></div>`;
+                const isOpen = formOpenField === f.id;
+                const restricted = (f.divisions || []).length;
+                let details = '';
+                if (isOpen) {
+                    const typeSel = sys
+                        ? `<span class="${inp} text-gray-300 bg-forest-800 inline-block">${FIELD_TYPE_LABEL[f.type]} <span class="text-[10px] text-gray-500">(kolom sistem)</span></span>`
+                        : `<select onchange="formEditField('${type}', '${f.id}', 'type', this.value, true)" class="${inp}">
+                            ${['text','textarea','date','number','select','checkbox','file'].map(k => `<option value="${k}" ${f.type === k ? 'selected' : ''}>${FIELD_TYPE_LABEL[k]}</option>`).join('')}
+                           </select>`;
+                    let extra = '';
+                    if (f.type === 'select' || f.type === 'checkbox') {
+                        extra += `<div><label class="text-[11px] text-gray-400">${f.type === 'checkbox' ? 'Opsi centang, satu per baris (kosongkan = satu kotak persetujuan)' : 'Opsi pilihan, satu per baris'}</label>
+                            <textarea rows="3" onchange="formEditField('${type}', '${f.id}', 'options', this.value)" class="${inp} mt-1">${escHtml((f.options || []).join('\n'))}</textarea></div>`;
+                    }
+                    if (f.type === 'file') {
+                        extra += `<div><label class="text-[11px] text-gray-400">Jenis file yang boleh diunggah (maks. ${MAX_FILE_KB} KB per file)</label>
+                            <div class="flex flex-wrap gap-4 mt-1.5 text-xs text-gray-200">
+                            ${Object.keys(FILE_KINDS).map(k => `<label class="flex items-center gap-1.5"><input type="checkbox" class="accent-yellow-500" ${(f.fileKinds || []).includes(k) ? 'checked' : ''} onchange="formToggleKind('${type}', '${f.id}', '${k}', this.checked)"> ${FILE_KINDS[k].label}</label>`).join('')}
+                            </div></div>`;
+                    }
+                    if (f.type !== 'division' && form.divisions.length) {
+                        extra += `<div><label class="text-[11px] text-gray-400">Tampil hanya untuk divisi (tidak dicentang = semua divisi)</label>
+                            <div class="flex flex-wrap gap-4 mt-1.5 text-xs text-gray-200">
+                            ${form.divisions.map(d => `<label class="flex items-center gap-1.5"><input type="checkbox" class="accent-yellow-500" ${(f.divisions || []).includes(d.name) ? 'checked' : ''} onchange="formToggleFieldDivision('${type}', '${f.id}', '${escHtml(d.name).replace(/'/g, '&#39;')}', this.checked)"> ${escHtml(d.name)}</label>`).join('')}
+                            </div></div>`;
+                    }
+                    details = `
+                    <div class="border-t border-forest-700 mt-3 pt-3 grid gap-3 sm:grid-cols-2">
+                        <div><label class="text-[11px] text-gray-400">Jenis kolom</label><div class="mt-1">${typeSel}</div></div>
+                        <div><label class="text-[11px] text-gray-400">Keterangan kecil di bawah kolom</label>
+                            <input type="text" value="${escHtml(f.help || '')}" placeholder="Opsional" onchange="formEditField('${type}', '${f.id}', 'help', this.value)" class="${inp} mt-1"></div>
+                        <div class="sm:col-span-2 grid gap-3">${extra}</div>
+                    </div>`;
                 }
                 return `
-                <div class="bg-forest-900/70 p-3 rounded-xl border border-forest-700">
-                    <div class="flex flex-wrap items-center gap-2">
+                <div class="bg-forest-900/70 border ${isOpen ? 'border-gold-600' : 'border-forest-700'} rounded-xl p-3">
+                    <div class="flex flex-wrap items-center gap-3">
+                        <span class="w-6 text-center text-xs text-gray-500">${i + 1}</span>
+                        <span class="w-9 h-9 rounded-lg bg-forest-800 border border-forest-600 text-gold-400 text-xs font-bold flex items-center justify-center" title="${FIELD_TYPE_LABEL[f.type]}">${FIELD_TYPE_ICON[f.type] || '?'}</span>
                         <input type="text" value="${escHtml(f.label)}" onchange="formEditField('${type}', '${f.id}', 'label', this.value)" class="${inp} flex-1 min-w-[9rem]" aria-label="Nama kolom">
-                        ${typeSel}
-                        <label class="flex items-center gap-1 text-xs ${lockedReq ? 'text-gray-500' : 'text-gray-200'}">
-                            <input type="checkbox" class="accent-yellow-500" ${f.required ? 'checked' : ''} ${lockedReq ? 'disabled' : ''} onchange="formEditField('${type}', '${f.id}', 'required', this.checked)"> Wajib
-                        </label>
-                        <button type="button" ${i === 0 ? 'disabled' : ''} onclick="formMoveField('${type}', '${f.id}', -1)" class="px-2 py-1.5 rounded-lg bg-forest-800 border border-forest-600 text-gold-400 text-xs disabled:opacity-30" title="Naik">▲</button>
-                        <button type="button" ${i === form.fields.length - 1 ? 'disabled' : ''} onclick="formMoveField('${type}', '${f.id}', 1)" class="px-2 py-1.5 rounded-lg bg-forest-800 border border-forest-600 text-gold-400 text-xs disabled:opacity-30" title="Turun">▼</button>
-                        ${sys ? '<span class="text-[10px] text-gray-500 px-1">kolom sistem</span>' : `<button type="button" onclick="formDeleteField('${type}', '${f.id}')" class="px-2.5 py-1.5 rounded-lg bg-red-600/20 hover:bg-red-600/40 text-red-400 text-xs font-semibold border border-red-600/40">Hapus</button>`}
+                        <span class="hidden md:inline text-[11px] text-gray-400 w-28">${FIELD_TYPE_LABEL[f.type]}${restricted ? ` · ${restricted} divisi` : ''}</span>
+                        ${uiSwitch(f.required, `formEditField('${type}', '${f.id}', 'required', this.checked, true)`, lockedReq, f.required ? 'Wajib' : 'Opsional')}
+                        <div class="flex items-center gap-1 ml-auto">
+                            <button type="button" ${i === 0 ? 'disabled' : ''} onclick="formMoveField('${type}', '${f.id}', -1)" class="w-8 h-8 rounded-lg bg-forest-800 border border-forest-600 text-gold-400 text-xs disabled:opacity-30" title="Naik">▲</button>
+                            <button type="button" ${i === form.fields.length - 1 ? 'disabled' : ''} onclick="formMoveField('${type}', '${f.id}', 1)" class="w-8 h-8 rounded-lg bg-forest-800 border border-forest-600 text-gold-400 text-xs disabled:opacity-30" title="Turun">▼</button>
+                            <button type="button" onclick="toggleFormField('${f.id}')" class="px-3 h-8 rounded-lg bg-forest-800 border border-forest-600 text-gold-400 text-xs font-semibold">${isOpen ? 'Tutup' : 'Atur'}</button>
+                            ${sys ? '' : `<button type="button" onclick="formDeleteField('${type}', '${f.id}')" class="px-3 h-8 rounded-lg bg-red-600/15 hover:bg-red-600/35 text-red-400 text-xs font-semibold border border-red-600/40">Hapus</button>`}
+                        </div>
                     </div>
-                    <input type="text" value="${escHtml(f.help || '')}" placeholder="Keterangan kecil di bawah kolom (opsional)" onchange="formEditField('${type}', '${f.id}', 'help', this.value)" class="${inp} w-full mt-2 text-xs">
-                    ${extra}
+                    ${details}
                 </div>`;
             }).join('');
 
             return `
-            <div class="bg-forest-800/80 p-6 rounded-2xl gold-border shadow-xl space-y-5">
-                <h3 class="font-serif text-xl font-bold text-gold-400">${title}</h3>
-
-                <div class="space-y-2">
-                    <div class="flex items-center justify-between">
-                        <h4 class="text-sm font-bold text-white">Divisi &amp; slot</h4>
-                        <button type="button" onclick="formRecount('${type}')" class="text-xs text-gold-400 underline">Hitung ulang slot terpakai</button>
-                    </div>
-                    <p class="text-[11px] text-gray-400">Ketik nama divisi sendiri. Slot 0 = tanpa batas. Pendaftar yang ditolak tidak memakai slot. Divisi yang penuh tidak bisa dipilih.</p>
-                    ${divRows || '<p class="text-xs text-gray-500 italic">Belum ada divisi — kolom pilihan divisi disembunyikan dari formulir.</p>'}
-                    <div class="flex flex-wrap items-center gap-2 pt-1">
-                        <input type="text" id="newDivName_${type}" placeholder="Nama divisi baru" class="${inp} flex-1 min-w-[8rem]">
-                        <input type="number" min="0" id="newDivSlots_${type}" placeholder="Slot" class="${inp} w-24">
-                        <button type="button" onclick="formAddDivision('${type}')" class="px-4 py-2 rounded-lg bg-gold-600 hover:bg-gold-500 text-black font-bold text-sm">Tambah divisi</button>
-                    </div>
+            <div class="space-y-5">
+                <div class="grid grid-cols-2 lg:grid-cols-4 gap-3">
+                    ${stat('Status', open ? 'Dibuka' : 'Ditutup', `<button onclick="toggleRegistration('${type}'); renderView();" class="underline text-gold-400">${open ? 'Tutup pendaftaran' : 'Buka pendaftaran'}</button>`, open ? 'text-green-400' : 'text-red-400')}
+                    ${stat('Pendaftar', list.length, `${list.filter(s => s.status === 'pending').length} menunggu keputusan`)}
+                    ${stat('Slot terpakai', totalSlots ? `${totalUsed}/${totalSlots}` : totalUsed, `${form.divisions.length} divisi`)}
+                    ${stat('Kolom formulir', form.fields.length, `${reqCount} wajib · ${form.fields.length - reqCount} opsional`)}
                 </div>
 
-                <div class="space-y-2">
-                    <h4 class="text-sm font-bold text-white">Kolom formulir</h4>
-                    <p class="text-[11px] text-gray-400">Urutan di sini = urutan di formulir. Perubahan langsung tersimpan dan tampil di halaman pendaftaran.</p>
-                    ${fieldRows}
+                <section class="bg-forest-800/60 border border-forest-700 rounded-2xl p-5 space-y-3">
+                    <div class="flex flex-wrap items-center justify-between gap-2">
+                        <div>
+                            <h4 class="font-serif text-lg font-bold text-gold-400">Divisi &amp; Slot</h4>
+                            <p class="text-[11px] text-gray-400">Ketik nama divisi sendiri. Slot 0 = tanpa batas. Yang ditolak tidak memakai slot; divisi penuh tidak bisa dipilih.</p>
+                        </div>
+                        <button type="button" onclick="formRecount('${type}')" class="px-3 py-1.5 rounded-lg bg-forest-900 border border-forest-600 text-gold-400 text-xs">Hitung ulang slot</button>
+                    </div>
+                    ${form.divisions.length ? `
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left">
+                            <thead><tr class="text-[11px] uppercase tracking-wide text-gray-400"><th class="pb-2 font-medium">Divisi</th><th class="pb-2 font-medium">Slot</th><th class="pb-2 font-medium">Terisi</th><th></th></tr></thead>
+                            <tbody>${divRows}</tbody>
+                        </table>
+                    </div>` : '<p class="text-xs text-gray-500 italic">Belum ada divisi, kolom pilihan divisi disembunyikan dari formulir.</p>'}
+                    <div class="grid grid-cols-[1fr_6rem_auto] gap-2 pt-1">
+                        <input type="text" id="newDivName_${type}" placeholder="Nama divisi baru" class="${inp}">
+                        <input type="number" min="0" id="newDivSlots_${type}" placeholder="Slot" class="${inp}">
+                        <button type="button" onclick="formAddDivision('${type}')" class="px-4 rounded-lg bg-gold-600 hover:bg-gold-500 text-black font-bold text-sm">Tambah</button>
+                    </div>
+                </section>
+
+                <section class="bg-forest-800/60 border border-forest-700 rounded-2xl p-5 space-y-3">
+                    <div class="flex flex-wrap items-center justify-between gap-2">
+                        <div>
+                            <h4 class="font-serif text-lg font-bold text-gold-400">Kolom Formulir</h4>
+                            <p class="text-[11px] text-gray-400">Urutan di sini = urutan di formulir. Geser sakelar untuk wajib/opsional, klik <strong>Atur</strong> untuk opsi lanjutan. Perubahan langsung tersimpan.</p>
+                        </div>
+                        <button type="button" onclick="navigate('${type === 'trainee' ? 'pendaftaran-trainee' : 'pendaftaran-management'}')" class="px-3 py-1.5 rounded-lg bg-forest-900 border border-forest-600 text-gold-400 text-xs">Lihat halaman pendaftaran</button>
+                    </div>
+                    <div class="space-y-2">${fieldCards}</div>
                     <div class="flex flex-wrap items-center gap-2 pt-1">
-                        <select id="newFieldType_${type}" class="${inp}">
+                        <select id="newFieldType_${type}" class="${inp} !w-auto">
                             ${['text','textarea','date','number','select','checkbox','file'].map(k => `<option value="${k}">${FIELD_TYPE_LABEL[k]}</option>`).join('')}
                         </select>
                         <button type="button" onclick="formAddField('${type}')" class="px-4 py-2 rounded-lg bg-gold-600 hover:bg-gold-500 text-black font-bold text-sm">Tambah kolom</button>
                     </div>
-                </div>
+                </section>
             </div>`;
         }
         function renderFormBuilderTab() {
-            return `<div class="space-y-6">
-                ${renderFormBuilder('trainee', '🌱 Form Pendaftaran Trainee')}
-                ${renderFormBuilder('management', '🛡️ Form Pendaftaran management')}
+            const tabBtn = (t, label) => `<button type="button" onclick="setFormBuilderType('${t}')" class="px-5 py-2 rounded-lg text-sm font-semibold transition ${formBuilderType === t ? 'bg-gold-600 text-black' : 'text-gray-300 hover:text-gold-400'}">${label}</button>`;
+            return `<div class="space-y-5">
+                <div class="bg-forest-800/80 gold-border rounded-2xl p-5 flex flex-wrap items-center justify-between gap-3">
+                    <div>
+                        <h3 class="font-serif text-xl font-bold text-gold-400">Pengaturan Formulir Pendaftaran</h3>
+                        <p class="text-xs text-gray-400">Atur divisi, slot, dan kolom yang tampil di halaman pendaftaran.</p>
+                    </div>
+                    <div class="inline-flex p-1 rounded-xl bg-forest-900 border border-forest-700">${tabBtn('trainee', 'Trainee')}${tabBtn('management', 'Management')}</div>
+                </div>
+                ${renderFormBuilder(formBuilderType)}
             </div>`;
         }
-
 
         function renderView_admin_dashboard() {
             const content = document.getElementById('appContent');
