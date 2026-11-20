@@ -591,6 +591,58 @@
         status.ready = true;
     }
 
+
+    // ---------- Penyimpanan file media (video/audio) di Firestore, dipecah per ~525 KB ----------
+    const CHUNK = 700000;   // jumlah karakter base64 per dokumen (kelipatan 4)
+    window.loreviaMedia = {
+        async ready() {
+            if (window.loreviaDbReady) await window.loreviaDbReady;
+            if (!status.ok) throw new Error('Database online belum terhubung. Muat ulang halaman lalu coba lagi.');
+        },
+        // b64: isi file dalam base64 (tanpa awalan data:). Mengembalikan jumlah potongan.
+        async put(mid, b64, onProgress) {
+            await this.ready();
+            const n = Math.max(1, Math.ceil(b64.length / CHUNK));
+            for (let i = 0; i < n; i += 4) {
+                const batch = fs.writeBatch(db);
+                for (let k = i; k < Math.min(n, i + 4); k++) {
+                    batch.set(fs.doc(db, 'mediaChunks', mid + '_' + k), { m: mid, i: k, d: b64.slice(k * CHUNK, (k + 1) * CHUNK) });
+                }
+                await batch.commit();
+                if (onProgress) onProgress(Math.min(n, i + 4), n);
+            }
+            return n;
+        },
+        async get(mid, n, onProgress) {
+            await this.ready();
+            const parts = new Array(n);
+            let done = 0;
+            const queue = Array.from({ length: n }, (_, i) => i);
+            async function worker() {
+                while (queue.length) {
+                    const i = queue.shift();
+                    const snap = await fs.getDoc(fs.doc(db, 'mediaChunks', mid + '_' + i));
+                    if (!snap.exists()) throw new Error('File media tidak lengkap (potongan ' + (i + 1) + '/' + n + ' hilang).');
+                    parts[i] = snap.data().d;
+                    done++;
+                    if (onProgress) onProgress(done, n);
+                }
+            }
+            await Promise.all([worker(), worker(), worker(), worker()]);
+            return parts;
+        },
+        async del(mid, n) {
+            try {
+                await this.ready();
+                for (let i = 0; i < n; i += 400) {
+                    const batch = fs.writeBatch(db);
+                    for (let k = i; k < Math.min(n, i + 400); k++) batch.delete(fs.doc(db, 'mediaChunks', mid + '_' + k));
+                    await batch.commit();
+                }
+            } catch (e) { console.warn('[Lorevia DB] gagal menghapus potongan media:', e); }
+        }
+    };
+
     window.addEventListener('visibilitychange', () => {
         if (document.visibilityState === 'hidden' && status.ok) window.loreviaDbFlush();
     });
@@ -782,7 +834,7 @@ async function kirimKeSheet(type, data) {
 
         window.addEventListener('beforeunload', persistState);
 
-        const ROUTE_TITLES = {"beranda": "Lorevia Entertainment 🌿 | Agensi Terbaik di RVN Sepanjang Masa", "gen-members": "Member Generasi - Lorevia Entertainment", "pendaftaran-trainee": "Pendaftaran Trainee - Lorevia Entertainment", "pendaftaran-management": "Pendaftaran management - Lorevia Entertainment", "cek-hasil": "Cek Hasil Seleksi - Lorevia Entertainment", "about": "About - Lorevia Entertainment", "member": "Member - Lorevia Entertainment", "toko": "Toko - Lorevia Entertainment", "checkout": "Checkout - Lorevia Entertainment", "pengumuman": "Pengumuman - Lorevia Entertainment", "achievement": "Achievement - Lorevia Entertainment", "struktur": "Struktur Admin - Lorevia Entertainment", "guestbox": "Guest Box - Lorevia Entertainment", "history": "History & Kerja Sama - Lorevia Entertainment", "dispatch": "Dispatch Resmi - Lorevia Entertainment", "medpart": "Official Promote Medpart - Lorevia Entertainment", "video-playlist": "Video Playlist - Lorevia Entertainment", "audio-playlist": "Audio Playlist - Lorevia Entertainment", "admin-dashboard": "Dasbor Admin - Lorevia Entertainment"};
+        const ROUTE_TITLES = {"beranda": "Lorevia Entertainment 🌿 | Agensi Terbaik di RVN Sepanjang Masa", "gen-members": "Member Generasi - Lorevia Entertainment", "pendaftaran-trainee": "Pendaftaran Trainee - Lorevia Entertainment", "pendaftaran-management": "Pendaftaran management - Lorevia Entertainment", "cek-hasil": "Cek Hasil Seleksi - Lorevia Entertainment", "about": "About - Lorevia Entertainment", "member": "Member - Lorevia Entertainment", "toko": "Toko - Lorevia Entertainment", "checkout": "Checkout - Lorevia Entertainment", "pengumuman": "Pengumuman - Lorevia Entertainment", "achievement": "Achievement - Lorevia Entertainment", "struktur": "Struktur Admin - Lorevia Entertainment", "guestbox": "Guest Box - Lorevia Entertainment", "history": "History Lorevia - Lorevia Entertainment", "dispatch": "Dispatch Resmi - Lorevia Entertainment", "medpart": "Official Promote Medpart - Lorevia Entertainment", "video-playlist": "Video Playlist - Lorevia Entertainment", "audio-playlist": "Audio Playlist - Lorevia Entertainment", "admin-dashboard": "Dasbor Admin - Lorevia Entertainment"};
 
         let currentRoute = window.PAGE_ROUTE || 'beranda';
         // Akses admin: buka  situs.com/#loreviaadmin  (tanpa sandi). Status disimpan di sessionStorage
@@ -1497,40 +1549,6 @@ async function kirimKeSheet(type, data) {
             `;
         }
 
-        async function savePlaylist(e) {
-            e.preventDefault();
-            const type = playlistModalType;
-            if (!type) return;
-            const key = type === 'video' ? 'videoPlaylists' : 'audioPlaylists';
-            const name = document.getElementById('newPlaylistName').value.trim();
-            const desc = document.getElementById('newPlaylistDesc').value.trim();
-            const imgFile = document.getElementById('newPlaylistImg').files[0];
-            if (!name) return;
-            let image = '';
-            let cover = null;
-            if (imgFile) {
-                cover = await readFileAsBase64(imgFile);
-            }
-            const playlistId = 'pl_' + Date.now();
-            const result = await kirimKeSheet('playlist', {
-                mediaType: type,
-                recordType: 'playlist',
-                id: playlistId,
-                name,
-                desc,
-                cover
-            });
-            if (!result.ok) {
-                alert('Playlist gagal disimpan ke database: ' + (result.error || 'error tidak diketahui'));
-                return;
-            }
-            appData[key].push({ id: playlistId, name, desc, image: result.coverUrl || image });
-            saveAppData();
-            showAddPlaylistForm = false;
-            renderPlaylistModal();
-            renderView();
-        }
-
         function deletePlaylist(idx) {
             const type = playlistModalType;
             if (!type) return;
@@ -1543,44 +1561,6 @@ async function kirimKeSheet(type, data) {
             saveAppData();
             renderPlaylistModal();
             renderView();
-        }
-
-        async function addVideo(e) {
-            e.preventDefault();
-            const title = document.getElementById('vidTitle').value;
-            const date = document.getElementById('vidDate').value;
-            const playlistId = document.getElementById('vidPlaylist').value || null;
-            const file = document.getElementById('vidFile').files[0];
-            const thumbFile = document.getElementById('vidThumb').files[0];
-            if (!file) return;
-            const btn = document.getElementById('vidSubmitBtn');
-            btn.disabled = true;
-            btn.textContent = 'Mengunggah...';
-            try {
-                const orientation = await detectVideoOrientation(file);
-                const uploaded = await readFileAsBase64(file);
-                const uploadedThumb = thumbFile ? await readFileAsBase64(thumbFile) : null;
-                const videoId = 'vid_' + Date.now();
-                const result = await kirimKeSheet('playlist', {
-                    mediaType: 'video',
-                    recordType: 'item',
-                    id: videoId,
-                    title,
-                    date,
-                    playlistId,
-                    orientation,
-                    media: uploaded,
-                    cover: uploadedThumb
-                });
-                if (!result.ok) throw new Error(result.error || 'Gagal menyimpan video ke database');
-                appData.videos.unshift({ id: videoId, title, date, playlistId, orientation, data: result.mediaUrl, fileType: uploaded.type, thumbnail: result.coverUrl || '', views: 0, likes: 0, comments: [] });
-                saveAppData();
-                renderView();
-            } catch (err) {
-                alert('Gagal mengunggah video. File mungkin terlalu besar untuk disimpan.');
-                btn.disabled = false;
-                btn.textContent = 'Tambah Video';
-            }
         }
 
         async function updateVideo(idx) {
@@ -1599,50 +1579,6 @@ async function kirimKeSheet(type, data) {
             renderView();
         }
 
-        function deleteVideo(idx) {
-            if (confirm('Apakah Anda yakin ingin menghapus video ini?')) {
-                appData.videos.splice(idx, 1);
-                saveAppData();
-                renderView();
-            }
-        }
-
-        async function addAudio(e) {
-            e.preventDefault();
-            const title = document.getElementById('audTitle').value;
-            const date = document.getElementById('audDate').value;
-            const playlistId = document.getElementById('audPlaylist').value || null;
-            const file = document.getElementById('audFile').files[0];
-            const thumbFile = document.getElementById('audThumb').files[0];
-            if (!file) return;
-            const btn = document.getElementById('audSubmitBtn');
-            btn.disabled = true;
-            btn.textContent = 'Mengunggah...';
-            try {
-                const uploaded = await readFileAsBase64(file);
-                const uploadedThumb = thumbFile ? await readFileAsBase64(thumbFile) : null;
-                const audioId = 'aud_' + Date.now();
-                const result = await kirimKeSheet('playlist', {
-                    mediaType: 'audio',
-                    recordType: 'item',
-                    id: audioId,
-                    title,
-                    date,
-                    playlistId,
-                    media: uploaded,
-                    cover: uploadedThumb
-                });
-                if (!result.ok) throw new Error(result.error || 'Gagal menyimpan audio ke database');
-                appData.audios.unshift({ id: audioId, title, date, playlistId, data: result.mediaUrl, fileType: uploaded.type, cover: result.coverUrl || '', plays: 0, likes: 0, comments: [] });
-                saveAppData();
-                renderView();
-            } catch (err) {
-                alert('Gagal mengunggah audio. File mungkin terlalu besar untuk disimpan.');
-                btn.disabled = false;
-                btn.textContent = 'Tambah Audio';
-            }
-        }
-
         async function updateAudio(idx) {
             const title = document.getElementById(`audTitleEdit_${idx}`).value;
             const date = document.getElementById(`audDateEdit_${idx}`).value;
@@ -1659,14 +1595,6 @@ async function kirimKeSheet(type, data) {
             renderView();
         }
 
-        function deleteAudio(idx) {
-            if (confirm('Apakah Anda yakin ingin menghapus audio ini?')) {
-                appData.audios.splice(idx, 1);
-                saveAppData();
-                renderView();
-            }
-        }
-
         // ===== TikTok-style Video Feed =====
         let ttFeedList = [];
         let ttObserver = null;
@@ -1675,7 +1603,8 @@ async function kirimKeSheet(type, data) {
             const v = appData.videos[idx];
             return `
                 <div class="tt-slide relative w-full bg-black flex items-center justify-center" data-idx="${idx}">
-                    <video src="${v.data}" class="tt-video" loop playsinline webkit-playsinline="true"></video>
+                    <video ${String(v.data || '').indexOf('fs:') === 0 ? 'data-fs="1"' : 'src="' + v.data + '"'} class="tt-video" loop playsinline webkit-playsinline="true"></video>
+                    <div id="ttLoad_${idx}" class="tt-loading absolute inset-0 hidden items-center justify-center text-white text-sm pointer-events-none">Memuat video...</div>
                     <div class="absolute inset-0" onclick="ttTogglePlay(${idx})"></div>
                     <button type="button" onclick="event.stopPropagation(); ttToggleMute(${idx})" id="ttMuteBtn_${idx}" class="absolute top-4 left-4 z-10 w-9 h-9 rounded-full bg-black/50 text-white flex items-center justify-center text-lg">🔊</button>
                     <div class="absolute inset-x-0 bottom-0 h-40 bg-gradient-to-t from-black/85 via-black/25 to-transparent pointer-events-none"></div>
@@ -1722,18 +1651,10 @@ async function kirimKeSheet(type, data) {
                     const slideIdx = parseInt(entry.target.dataset.idx, 10);
                     if (!video) return;
                     if (entry.isIntersecting && entry.intersectionRatio >= 0.6) {
-                        video.currentTime = video.currentTime || 0;
-                        const playPromise = video.play();
-                        if (playPromise && playPromise.catch) {
-                            playPromise.catch(() => {
-                                video.muted = true;
-                                const btn = document.getElementById(`ttMuteBtn_${slideIdx}`);
-                                if (btn) btn.textContent = '🔇';
-                                video.play().catch(() => {});
-                            });
-                        }
+                        ttStartVideo(video, slideIdx);
                         ttCountView(slideIdx);
                     } else {
+                        video._want = false;
                         video.pause();
                     }
                 });
@@ -1788,7 +1709,7 @@ async function kirimKeSheet(type, data) {
         }
 
         // Mainkan audio dari banner playlist audio; hitung pendengar naik sekali per klik play
-        function playAudio(idx) {
+        async function playAudio(idx) {
             const a = appData.audios[idx];
             if (!a) return;
             document.querySelectorAll('audio[id^="audioPlayer_"]').forEach((el, i) => {
@@ -1808,8 +1729,13 @@ async function kirimKeSheet(type, data) {
             const card = document.getElementById(`audioCard_${idx}`);
             const eq = document.getElementById(`audioEq_${idx}`);
             if (!player) return;
+            if (!player.getAttribute('src') && String(a.data || '').indexOf('fs:') === 0) {
+                btn.textContent = '...';
+                try { player.src = await mediaUrl(a); }
+                catch (err) { console.error(err); alert('Gagal memuat audio: ' + (err.message || err)); btn.textContent = '▶'; return; }
+            }
             if (player.paused) {
-                player.play();
+                player.play().catch(() => { btn.textContent = '▶'; });
                 btn.textContent = '❚❚';
                 if (card) card.classList.add('playing');
                 if (eq) eq.classList.add('flex');
@@ -3184,14 +3110,11 @@ function renderHistoryTab() {
     const blocks = e ? (e.contents || []) : [];
     return `<div class="space-y-6">
         ${cardBox(`
-            ${formHead('history', 'History, Kerja Sama & Medpart', e)}
+            ${formHead('history', 'History Lorevia', e)}
             <form id="form_history" onsubmit="saveHistory(event)" class="space-y-3">
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <div><label class="${A_LBL}">Judul</label><input type="text" id="hTitle" required value="${escHtml(e ? e.title : '')}" class="${A_INP}"></div>
                     <div><label class="${A_LBL}">Tanggal</label><input type="date" id="hDate" ${e ? '' : 'required'} value="${e && /^\d{4}-\d{2}-\d{2}$/.test(e.date || '') ? e.date : ''}" class="${A_INP}"></div>
-                    <div><label class="${A_LBL}">Kategori</label>
-                        <select id="hCategory" class="${A_INP}">${['History', 'Kerja Sama', 'Medpart'].map(c => `<option ${e && e.category === c ? 'selected' : ''}>${c}</option>`).join('')}</select></div>
-                    <div><label class="${A_LBL}">Nama agensi / mitra (opsional)</label><input type="text" id="hPartner" value="${escHtml(e ? e.partner || '' : '')}" placeholder="cth: Nama agensi yang bekerja sama" class="${A_INP}"></div>
                 </div>
                 ${photoField('hPhoto', e && e.photo)}
                 <div><label class="${A_LBL}">Cerita latar belakang</label>${richEditorHtml('hStory', { initial: e ? e.story : '', placeholder: 'Ceritakan latar belakang agensi / kerja sama ini...', minH: 220 })}</div>
@@ -3202,7 +3125,7 @@ function renderHistoryTab() {
                 </div>
                 <button type="submit" class="${A_BTN}">${e ? 'Simpan Perubahan' : 'Tambahkan'}</button>
             </form>
-            ${listBox((appData.histories || []).map((h, i) => itemRow(h.photo, h.title, (h.category || '') + ' · ' + fmtDate(h.date), 'history', i, 'deleteHistory')).join(''))}
+            ${listBox((appData.histories || []).map((h, i) => itemRow(h.photo, h.title, fmtDate(h.date), 'history', i, 'deleteHistory')).join(''))}
         `)}
     </div>`;
 }
@@ -3212,8 +3135,6 @@ async function saveHistory(e) {
         const ed = adminEditing('history');
         const title = document.getElementById('hTitle').value.trim();
         const date = document.getElementById('hDate').value || (ed ? ed.date : '');
-        const category = document.getElementById('hCategory').value;
-        const partner = document.getElementById('hPartner').value.trim();
         const story = richGet('hStory');
         const contents = Array.from(document.querySelectorAll('#histBlocks .hist-block')).map(b => ({
             heading: b.querySelector('.hc-heading').value.trim(),
@@ -3221,7 +3142,7 @@ async function saveHistory(e) {
         })).filter(c => c.heading || c.body);
         if (!story && !contents.length) throw adminFail('Isi cerita latar belakang atau minimal satu bagian isi.');
         const photo = await adminPhoto('hPhoto', 'history');
-        const data = { title, date, category, partner, story, contents };
+        const data = { title, date, story, contents };
         if (ed) { Object.assign(ed, data); if (photo) ed.photo = photo; }
         else appData.histories.unshift({ id: Date.now(), ...data, photo: photo || null });
         const wasEdit = !!ed; adminEdit = null;
@@ -3311,6 +3232,229 @@ async function saveMedpart(e) {
         const wasEdit = !!ed; adminEdit = null;
         await commitAdminChange(wasEdit ? 'Promosi berhasil diperbarui!' : 'Promosi medpart berhasil ditambahkan!');
     } catch (err) { adminActionFailed(err); }
+}
+
+
+/* ################ Media video/audio ################ */
+// Video & audio playlist: file diunggah dan disimpan langsung di database Firestore (tanpa Google Drive / Apps Script).
+// File dipecah jadi potongan base64 di koleksi "mediaChunks"; item (judul, tanggal, playlist, dll) di koleksi videos/audios.
+
+const MAX_VIDEO_MB = 25, MAX_AUDIO_MB = 12;
+const mediaUrlCache = {};
+
+function readFileB64(file, onProgress) {
+    return new Promise((resolve, reject) => {
+        const r = new FileReader();
+        r.onprogress = e => { if (onProgress && e.lengthComputable) onProgress(e.loaded / e.total); };
+        r.onload = () => {
+            const s = String(r.result || '');
+            const i = s.indexOf(',');
+            resolve(i >= 0 ? s.slice(i + 1) : s);
+        };
+        r.onerror = () => reject(r.error || new Error('Gagal membaca file.'));
+        r.readAsDataURL(file);
+    });
+}
+
+// Alamat yang bisa diputar untuk sebuah item video/audio (mengunduh potongannya dari database bila perlu)
+async function mediaUrl(item, onProgress) {
+    const d = String(item.data || '');
+    if (d.indexOf('fs:') !== 0) return d;
+    const mid = d.slice(3);
+    if (mediaUrlCache[mid]) return mediaUrlCache[mid];
+    const parts = await window.loreviaMedia.get(mid, item.chunks || 1, onProgress);
+    const bytes = parts.map(p => {
+        const bin = atob(p);
+        const u = new Uint8Array(bin.length);
+        for (let i = 0; i < bin.length; i++) u[i] = bin.charCodeAt(i);
+        return u;
+    });
+    const blob = new Blob(bytes, { type: item.fileType || 'application/octet-stream' });
+    return (mediaUrlCache[mid] = URL.createObjectURL(blob));
+}
+
+// Orientasi + gambar sampul otomatis dari video
+function inspectVideo(file) {
+    return new Promise(resolve => {
+        const url = URL.createObjectURL(file);
+        const v = document.createElement('video');
+        v.muted = true; v.preload = 'auto'; v.playsInline = true;
+        let finished = false;
+        const done = (res) => { if (finished) return; finished = true; URL.revokeObjectURL(url); resolve(res); };
+        const timer = setTimeout(() => done({ orientation: 'landscape', thumb: '' }), 8000);
+        v.onloadedmetadata = () => { try { v.currentTime = Math.min(1, (v.duration || 2) / 4); } catch (e) {} };
+        v.onseeked = () => {
+            clearTimeout(timer);
+            const w = v.videoWidth || 0, h = v.videoHeight || 0;
+            let thumb = '';
+            try {
+                const scale = Math.min(1, 480 / Math.max(1, Math.max(w, h)));
+                const c = document.createElement('canvas');
+                c.width = Math.max(1, Math.round(w * scale)); c.height = Math.max(1, Math.round(h * scale));
+                c.getContext('2d').drawImage(v, 0, 0, c.width, c.height);
+                thumb = c.toDataURL('image/jpeg', 0.7);
+            } catch (e) { thumb = ''; }
+            done({ orientation: h > w ? 'portrait' : 'landscape', thumb });
+        };
+        v.onerror = () => { clearTimeout(timer); done({ orientation: 'landscape', thumb: '' }); };
+        v.src = url;
+    });
+}
+
+async function uploadMediaFile(file, kind, setStatus) {
+    const maxMb = kind === 'video' ? MAX_VIDEO_MB : MAX_AUDIO_MB;
+    if (file.size > maxMb * 1024 * 1024) {
+        throw new Error('File terlalu besar (' + (file.size / 1048576).toFixed(1) + ' MB). Maksimal ' + maxMb + ' MB untuk ' + kind + '.');
+    }
+    const mid = (kind === 'video' ? 'vid_' : 'aud_') + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+    setStatus('Membaca file...');
+    const b64 = await readFileB64(file, p => setStatus('Membaca file ' + Math.round(p * 100) + '%'));
+    const chunks = await window.loreviaMedia.put(mid, b64, (d, n) => setStatus('Mengunggah ' + d + '/' + n + '...'));
+    return { mid, chunks };
+}
+
+// ---------------- Playlist ----------------
+async function savePlaylist(e) {
+    e.preventDefault();
+    const type = playlistModalType;
+    if (!type) return;
+    const key = type === 'video' ? 'videoPlaylists' : 'audioPlaylists';
+    const name = document.getElementById('newPlaylistName').value.trim();
+    const desc = document.getElementById('newPlaylistDesc').value.trim();
+    const imgFile = document.getElementById('newPlaylistImg').files[0];
+    if (!name) return;
+    try {
+        const image = imgFile ? (await uploadMediaFiles([imgFile], 'playlist_' + Date.now(), 150000))[0] : '';
+        appData[key].push({ id: 'pl_' + Date.now(), name, desc, image });
+        saveAppData();
+        const ok = await window.loreviaDbFlush();
+        showAddPlaylistForm = false;
+        renderPlaylistModal();
+        renderView();
+        if (!ok) alert('Playlist tersimpan di browser ini, tetapi belum masuk database online. Muat ulang halaman lalu coba lagi.');
+    } catch (err) {
+        console.error(err);
+        alert('Playlist gagal disimpan: ' + (err.message || err));
+    }
+}
+
+// ---------------- Video ----------------
+async function addVideo(e) {
+    e.preventDefault();
+    const title = document.getElementById('vidTitle').value.trim();
+    const date = document.getElementById('vidDate').value.trim();
+    const playlistId = document.getElementById('vidPlaylist').value || null;
+    const file = document.getElementById('vidFile').files[0];
+    const thumbFile = document.getElementById('vidThumb').files[0];
+    if (!file) return;
+    const btn = document.getElementById('vidSubmitBtn');
+    const setStatus = t => { btn.textContent = t; };
+    btn.disabled = true;
+    try {
+        if (!file.type.startsWith('video/')) throw new Error('File harus berupa video.');
+        setStatus('Memeriksa video...');
+        const info = await inspectVideo(file);
+        const up = await uploadMediaFile(file, 'video', setStatus);
+        setStatus('Menyimpan...');
+        const thumbnail = thumbFile ? (await uploadMediaFiles([thumbFile], 'video_cover_' + Date.now(), 150000))[0] : info.thumb;
+        appData.videos.unshift({ id: up.mid, title, date, playlistId, orientation: info.orientation, data: 'fs:' + up.mid, chunks: up.chunks,
+            fileType: file.type || 'video/mp4', thumbnail: thumbnail || '', views: 0, likes: 0, comments: [] });
+        saveAppData();
+        const ok = await window.loreviaDbFlush();
+        renderView();
+        alert(ok ? 'Video berhasil diunggah!' : 'Video tersimpan, tetapi data judulnya belum masuk database online. Muat ulang halaman dan cek lagi.');
+    } catch (err) {
+        console.error(err);
+        alert('Gagal mengunggah video: ' + (err.message || err));
+        btn.disabled = false;
+        btn.textContent = 'Tambah Video';
+    }
+}
+
+function deleteVideo(idx) {
+    const v = appData.videos[idx];
+    if (!v || !confirm('Apakah Anda yakin ingin menghapus video ini?')) return;
+    if (String(v.data || '').indexOf('fs:') === 0) window.loreviaMedia.del(v.data.slice(3), v.chunks || 1);
+    appData.videos.splice(idx, 1);
+    saveAppData();
+    renderView();
+}
+
+// ---------------- Audio ----------------
+async function addAudio(e) {
+    e.preventDefault();
+    const title = document.getElementById('audTitle').value.trim();
+    const date = document.getElementById('audDate').value.trim();
+    const playlistId = document.getElementById('audPlaylist').value || null;
+    const file = document.getElementById('audFile').files[0];
+    const thumbFile = document.getElementById('audThumb').files[0];
+    if (!file) return;
+    const btn = document.getElementById('audSubmitBtn');
+    const setStatus = t => { btn.textContent = t; };
+    btn.disabled = true;
+    try {
+        if (!file.type.startsWith('audio/') && !/\.(mp3|m4a|aac|wav|ogg|opus|flac)$/i.test(file.name)) throw new Error('File harus berupa audio.');
+        const up = await uploadMediaFile(file, 'audio', setStatus);
+        setStatus('Menyimpan...');
+        const cover = thumbFile ? (await uploadMediaFiles([thumbFile], 'audio_cover_' + Date.now(), 150000))[0] : '';
+        appData.audios.unshift({ id: up.mid, title, date, playlistId, data: 'fs:' + up.mid, chunks: up.chunks,
+            fileType: file.type || 'audio/mpeg', cover: cover || '', plays: 0, likes: 0, comments: [] });
+        saveAppData();
+        const ok = await window.loreviaDbFlush();
+        renderView();
+        alert(ok ? 'Audio berhasil diunggah!' : 'Audio tersimpan, tetapi data judulnya belum masuk database online. Muat ulang halaman dan cek lagi.');
+    } catch (err) {
+        console.error(err);
+        alert('Gagal mengunggah audio: ' + (err.message || err));
+        btn.disabled = false;
+        btn.textContent = 'Tambah Audio';
+    }
+}
+
+function deleteAudio(idx) {
+    const a = appData.audios[idx];
+    if (!a || !confirm('Apakah Anda yakin ingin menghapus audio ini?')) return;
+    if (String(a.data || '').indexOf('fs:') === 0) window.loreviaMedia.del(a.data.slice(3), a.chunks || 1);
+    appData.audios.splice(idx, 1);
+    saveAppData();
+    renderView();
+}
+
+// Dasbor: putar audio (diunduh dulu dari database)
+async function adminLoadAudio(idx, btn) {
+    const a = appData.audios[idx];
+    if (!a) return;
+    btn.disabled = true; btn.textContent = 'Memuat...';
+    try {
+        const url = await mediaUrl(a);
+        btn.outerHTML = `<audio controls autoplay src="${url}" class="h-8 max-w-[220px] w-full sm:w-auto"></audio>`;
+    } catch (err) { alert('Gagal memuat audio: ' + (err.message || err)); btn.disabled = false; btn.textContent = '▶ Putar'; }
+}
+
+// Feed video: mulai putar (memuat dulu bila disimpan di database)
+async function ttStartVideo(video, slideIdx) {
+    video._want = true;
+    const v = appData.videos[slideIdx];
+    const load = document.getElementById('ttLoad_' + slideIdx);
+    if (!video.getAttribute('src') && video.dataset.fs && v) {
+        if (load) { load.classList.remove('hidden'); load.classList.add('flex'); }
+        try {
+            video.src = await mediaUrl(v, (d, n) => { if (load) load.textContent = 'Memuat video ' + Math.round(d / n * 100) + '%'; });
+        } catch (err) {
+            console.error(err);
+            if (load) load.textContent = 'Gagal memuat video: ' + (err.message || err);
+            return;
+        }
+        if (load) { load.classList.add('hidden'); load.classList.remove('flex'); }
+    }
+    if (!video._want) return;   // sudah digeser ke video lain saat memuat
+    const p = video.play();
+    if (p && p.catch) p.catch(() => {
+        video.muted = true;
+        const btn = document.getElementById('ttMuteBtn_' + slideIdx);
+        if (btn) btn.textContent = '🔇';
+        video.play().catch(() => {});
+    });
 }
 
 
@@ -3982,40 +4126,28 @@ async function saveMedpart(e) {
 
 
 // ======== Halaman: history ========
-// Halaman "History & Kerja Sama" (route: history): sejarah agensi, kerja sama/medpart, lengkap dengan foto, cerita latar belakang, dan beberapa isi.
-let historyFilter = 'Semua';
-function setHistoryFilter(f) { historyFilter = f; renderView(); }
-
+// Halaman "History Lorevia" (route: history): sejarah agensi Lorevia sendiri, dengan foto, cerita latar belakang, beberapa isi, dan tanggal.
 function renderView_history() {
     const content = document.getElementById('appContent');
     if (currentRoute !== 'toko') stopPromoBanner();
     if (currentRoute === 'history') {
-        const cats = ['Semua', 'History', 'Kerja Sama', 'Medpart'];
-        const list = (appData.histories || []).filter(h => historyFilter === 'Semua' || h.category === historyFilter)
-            .slice().sort((a, b) => String(a.date).localeCompare(String(b.date)));
+                const list = (appData.histories || []).slice().sort((a, b) => String(a.date).localeCompare(String(b.date)));
         content.innerHTML = `
             <div class="max-w-4xl mx-auto py-8 space-y-6">
                 <div class="text-center">
-                    <h2 class="font-serif text-3xl font-bold gold-text">History &amp; Kerja Sama</h2>
-                    <p class="text-gray-300 mt-1">Perjalanan Lorevia Entertainment, kolaborasi dengan agensi lain, dan kerja sama medpart.</p>
-                </div>
-                <div class="flex flex-wrap justify-center gap-2">
-                    ${cats.map(c => `<button onclick="setHistoryFilter('${c}')" class="chip ${historyFilter === c ? 'on' : ''}">${c}</button>`).join('')}
+                    <h2 class="font-serif text-3xl font-bold gold-text">History Lorevia</h2>
+                    <p class="text-gray-300 mt-1">Perjalanan dan cerita latar belakang Lorevia Entertainment dari awal berdiri.</p>
                 </div>
                 <div class="hist-line space-y-6">
                     ${list.length === 0 ? `
                         <div class="text-center py-14 bg-forest-800/40 rounded-2xl border border-forest-700">
-                            <p class="text-gray-400 text-sm">Belum ada data di kategori ini.</p>
+                            <p class="text-gray-400 text-sm">Belum ada sejarah yang ditambahkan.</p>
                         </div>
                     ` : list.map((h, i) => `
                         <article class="bg-forest-800/80 p-5 md:p-6 rounded-2xl gold-border shadow-xl space-y-3 relative" data-reveal="${i % 2 ? 'right' : 'left'}">
                             <span class="hist-dot"></span>
-                            <div class="flex flex-wrap items-center justify-between gap-2 text-xs font-semibold">
-                                <span class="px-3 py-1 rounded-full bg-gold-600 text-black">${escHtml(h.category || 'History')}</span>
-                                <span class="text-gold-400">${escHtml(fmtDate(h.date))}</span>
-                            </div>
+                            <div class="text-xs font-semibold text-gold-400">${escHtml(fmtDate(h.date))}</div>
                             <h3 class="font-serif text-xl md:text-2xl font-bold text-white">${escHtml(h.title)}</h3>
-                            ${h.partner ? `<p class="text-sm text-gold-400 font-semibold">Bersama: ${escHtml(h.partner)}</p>` : ''}
                             ${h.photo ? `<img src="${escHtml(h.photo)}" alt="${escHtml(h.title)}" class="w-full max-h-96 object-cover rounded-xl gold-border">` : ''}
                             ${h.story ? `<div><p class="text-[11px] font-bold tracking-widest uppercase text-gold-400 mb-1">Latar Belakang</p><div class="text-sm text-gray-200">${renderRich(h.story)}</div></div>` : ''}
                             ${(h.contents || []).map(c => `
@@ -4306,22 +4438,7 @@ async function loadGuestBoxes() {
 // Markup disalin apa adanya dari versi satu file.
 let videoPlaylistLoaded = false;
 
-async function loadVideoPlaylistData() {
-    if (videoPlaylistLoaded) return;
-    try {
-        const response = await fetch(`${API_URL}?type=video-playlist`, { cache: 'no-store' });
-        const result = await response.json();
-        if (!result.ok) throw new Error(result.error || 'Gagal memuat video playlist');
-        const playlists = result.data.filter(row => row['Tipe'] === 'playlist');
-        const items = result.data.filter(row => row['Tipe'] !== 'playlist');
-        appData.videoPlaylists = playlists.map(row => ({ id: row['ID'], name: row['Nama/Judul'] || '', desc: row['Deskripsi/Tanggal'] || '', image: row['URL Cover'] || '' }));
-        appData.videos = items.map(row => ({ id: row['ID'], title: row['Nama/Judul'] || '', date: row['Deskripsi/Tanggal'] || '', playlistId: row['Playlist ID'] || null, orientation: row['Orientasi'] || 'landscape', data: row['URL Media'] || '', thumbnail: row['URL Cover'] || '', views: 0, likes: 0, comments: [] })).filter(item => item.data);
-    } catch (error) {
-        console.error('Gagal load video playlist:', error);
-    } finally {
-        videoPlaylistLoaded = true;
-    }
-}
+async function loadVideoPlaylistData() { videoPlaylistLoaded = true; }   // data video & playlist dari Firestore
 
         function renderView_video_playlist() {
             const content = document.getElementById('appContent');
@@ -4366,7 +4483,7 @@ async function loadVideoPlaylistData() {
                             ${filteredVideos.map(({ v, i: idx }) => `
                                 <div onclick="openVideoPlayer(${idx})" class="w-[46%] sm:w-[30%] md:w-[22%] cursor-pointer group relative bg-forest-800/60 rounded-2xl border border-forest-700 overflow-hidden transition duration-300 hover:-translate-y-1 hover:border-gold-500/70 hover:shadow-xl hover:shadow-gold-600/20">
                                     <div class="${v.orientation === 'portrait' ? 'aspect-[9/16]' : 'aspect-video'} bg-black relative overflow-hidden">
-                                        ${v.thumbnail ? `<img src="${v.thumbnail}" alt="${v.title}" class="w-full h-full object-cover pointer-events-none transition duration-500 group-hover:scale-105">` : `<video src="${v.data}" class="w-full h-full object-cover pointer-events-none transition duration-500 group-hover:scale-105" muted preload="metadata"></video>`}
+                                        ${v.thumbnail ? `<img src="${v.thumbnail}" alt="${v.title}" class="w-full h-full object-cover pointer-events-none transition duration-500 group-hover:scale-105">` : (String(v.data || '').indexOf('fs:') === 0 ? '<div class="w-full h-full flex items-center justify-center text-gold-400 text-4xl">▶</div>' : `<video src="${v.data}" class="w-full h-full object-cover pointer-events-none transition duration-500 group-hover:scale-105" muted preload="metadata"></video>`)}
                                         <div class="absolute inset-0 bg-gradient-to-t from-black/70 via-black/10 to-transparent"></div>
                                         <div class="absolute inset-0 flex items-center justify-center">
                                             <span class="w-11 h-11 md:w-14 md:h-14 rounded-full bg-gold-500/90 text-black flex items-center justify-center text-lg md:text-2xl shadow-lg shadow-black/40 scale-90 group-hover:scale-100 transition duration-300">▶</span>
@@ -4405,22 +4522,7 @@ async function loadVideoPlaylistData() {
 // Markup disalin apa adanya dari versi satu file.
 let audioPlaylistLoaded = false;
 
-async function loadAudioPlaylistData() {
-    if (audioPlaylistLoaded) return;
-    try {
-        const response = await fetch(`${API_URL}?type=audio-playlist`, { cache: 'no-store' });
-        const result = await response.json();
-        if (!result.ok) throw new Error(result.error || 'Gagal memuat audio playlist');
-        const playlists = result.data.filter(row => row['Tipe'] === 'playlist');
-        const items = result.data.filter(row => row['Tipe'] !== 'playlist');
-        appData.audioPlaylists = playlists.map(row => ({ id: row['ID'], name: row['Nama/Judul'] || '', desc: row['Deskripsi/Tanggal'] || '', image: row['URL Cover'] || '' }));
-        appData.audios = items.map(row => ({ id: row['ID'], title: row['Nama/Judul'] || '', date: row['Deskripsi/Tanggal'] || '', playlistId: row['Playlist ID'] || null, data: row['URL Media'] || '', cover: row['URL Cover'] || '', plays: 0, likes: 0, comments: [] })).filter(item => item.data);
-    } catch (error) {
-        console.error('Gagal load audio playlist:', error);
-    } finally {
-        audioPlaylistLoaded = true;
-    }
-}
+async function loadAudioPlaylistData() { audioPlaylistLoaded = true; }   // data audio & playlist dari Firestore
 
         function renderView_audio_playlist() {
             const content = document.getElementById('appContent');
@@ -4488,7 +4590,7 @@ async function loadAudioPlaylistData() {
                                             💬 <span>${(a.comments && a.comments.length) || 0}</span>
                                         </button>
                                     </div>
-                                    <audio id="audioPlayer_${idx}" src="${a.data}" class="hidden" preload="none"></audio>
+                                    <audio id="audioPlayer_${idx}" ${String(a.data || '').indexOf('fs:') === 0 ? '' : 'src="' + a.data + '"'} class="hidden" preload="none"></audio>
                                 </div>
                             `).join('')}
                         </div>
@@ -4686,7 +4788,7 @@ async function loadAudioPlaylistData() {
                     { key: 'management', label: '🛡️ management' },
                     { key: 'member', label: '🌱 Trainee / Member' },
                     { key: 'announce', label: '📢 Pengumuman & Penghargaan' },
-                    { key: 'history', label: '📜 History & Kerja Sama' },
+                    { key: 'history', label: '📜 History Lorevia' },
                     { key: 'dispatch', label: '📰 Dispatch Resmi' },
                     { key: 'medpart', label: '🤝 Promote Medpart' },
                     { key: 'video', label: '🎬 Video Playlist' },
@@ -5083,7 +5185,7 @@ async function loadAudioPlaylistData() {
                                     <span>Unggah Video Baru</span>
                                     <button type="button" onclick="openPlaylistModal('video')" class="text-[11px] font-semibold px-3 py-1.5 rounded-lg bg-forest-900 border border-gold-600/50 text-gold-400 hover:bg-forest-700 transition flex items-center gap-1">🎬 Kelola Playlist</button>
                                 </h4>
-                                <p class="text-[11px] text-gray-400 -mt-2">Unggah file video (bukan link). Orientasi (potrait/landscape) terdeteksi otomatis dari ukuran videonya.</p>
+                                <p class="text-[11px] text-gray-400 -mt-2">Unggah file video (maks. 25 MB; tersimpan langsung di database). Orientasi (potrait/landscape) terdeteksi otomatis dari ukuran videonya.</p>
                                 <form onsubmit="addVideo(event)" class="grid grid-cols-1 sm:grid-cols-2 gap-3">
                                     <input type="text" id="vidTitle" placeholder="Judul Video" required class="sm:col-span-2 px-4 py-2.5 rounded-xl bg-forest-900 border border-forest-600 text-white text-sm outline-none">
                                     <input type="text" id="vidDate" placeholder="Tanggal (cth: 18 Mar 2026, opsional)" class="px-4 py-2.5 rounded-xl bg-forest-900 border border-forest-600 text-white text-sm outline-none">
@@ -5091,7 +5193,7 @@ async function loadAudioPlaylistData() {
                                         <option value="">Tanpa Playlist</option>
                                         ${appData.videoPlaylists.map(p => `<option value="${p.id}">${p.name}</option>`).join('')}
                                     </select>
-                                    <input type="file" accept="video/*" id="vidFile" required class="px-4 py-2.5 rounded-xl bg-forest-900 border border-forest-600 text-white text-xs outline-none file:mr-2 file:py-1 file:px-2 file:rounded file:border-0 file:bg-gold-600 file:text-black file:text-xs file:font-bold">
+                                    <input type="file" accept="video/*" id="vidFile" required title="Maks. 25 MB" class="px-4 py-2.5 rounded-xl bg-forest-900 border border-forest-600 text-white text-xs outline-none file:mr-2 file:py-1 file:px-2 file:rounded file:border-0 file:bg-gold-600 file:text-black file:text-xs file:font-bold">
                                     <input type="file" accept="image/*" id="vidThumb" class="px-4 py-2.5 rounded-xl bg-forest-900 border border-forest-600 text-white text-xs outline-none file:mr-2 file:py-1 file:px-2 file:rounded file:border-0 file:bg-gold-600 file:text-black file:text-xs file:font-bold" title="Thumbnail (opsional)">
                                     <button type="submit" id="vidSubmitBtn" class="sm:col-span-2 py-2.5 rounded-xl bg-gold-600 hover:bg-gold-500 text-black font-bold text-sm transition">Tambah Video</button>
                                 </form>
@@ -5106,7 +5208,7 @@ async function loadAudioPlaylistData() {
                                     ${appData.videos.length === 0 ? '<p class="text-sm text-gray-400 col-span-full text-center py-4">Belum ada video.</p>' : appData.videos.map((v, idx) => `
                                         <div class="bg-forest-900 rounded-xl border border-forest-700 overflow-hidden space-y-2">
                                             <div class="${v.orientation === 'portrait' ? 'aspect-[9/16]' : 'aspect-video'} bg-black">
-                                                ${v.thumbnail ? `<img src="${v.thumbnail}" class="w-full h-full object-cover" alt="Thumbnail">` : `<video src="${v.data}" class="w-full h-full object-cover" muted preload="metadata"></video>`}
+                                                ${v.thumbnail ? `<img src="${v.thumbnail}" class="w-full h-full object-cover" alt="Thumbnail">` : (String(v.data || '').indexOf('fs:') === 0 ? '<div class="w-full h-full flex items-center justify-center text-gold-400 text-3xl">▶</div>' : `<video src="${v.data}" class="w-full h-full object-cover" muted preload="metadata"></video>`)}
                                             </div>
                                             <div class="px-2 pb-2 space-y-1.5">
                                                 <p class="text-[10px] text-gray-400 uppercase">${v.orientation}${v.thumbnail ? ' · Thumbnail ✓' : ''}</p>
@@ -5138,7 +5240,7 @@ async function loadAudioPlaylistData() {
                                     <span>Unggah Audio Baru</span>
                                     <button type="button" onclick="openPlaylistModal('audio')" class="text-[11px] font-semibold px-3 py-1.5 rounded-lg bg-forest-900 border border-gold-600/50 text-gold-400 hover:bg-forest-700 transition flex items-center gap-1">🎧 Kelola Playlist</button>
                                 </h4>
-                                <p class="text-[11px] text-gray-400 -mt-2">Statistik jumlah pendengar akan tampil otomatis di banner audio, di dekat tombol play.</p>
+                                <p class="text-[11px] text-gray-400 -mt-2">Unggah file audio (maks. 12 MB; tersimpan langsung di database). Statistik pendengar tampil otomatis di dekat tombol play.</p>
                                 <form onsubmit="addAudio(event)" class="grid grid-cols-1 sm:grid-cols-2 gap-3">
                                     <input type="text" id="audTitle" placeholder="Judul Audio" required class="sm:col-span-2 px-4 py-2.5 rounded-xl bg-forest-900 border border-forest-600 text-white text-sm outline-none">
                                     <input type="text" id="audDate" placeholder="Tanggal (opsional)" class="px-4 py-2.5 rounded-xl bg-forest-900 border border-forest-600 text-white text-sm outline-none">
@@ -5146,7 +5248,7 @@ async function loadAudioPlaylistData() {
                                         <option value="">Tanpa Playlist</option>
                                         ${appData.audioPlaylists.map(p => `<option value="${p.id}">${p.name}</option>`).join('')}
                                     </select>
-                                    <input type="file" accept="audio/*" id="audFile" required class="px-4 py-2.5 rounded-xl bg-forest-900 border border-forest-600 text-white text-xs outline-none file:mr-2 file:py-1 file:px-2 file:rounded file:border-0 file:bg-gold-600 file:text-black file:text-xs file:font-bold">
+                                    <input type="file" accept="audio/*" id="audFile" required title="Maks. 12 MB" class="px-4 py-2.5 rounded-xl bg-forest-900 border border-forest-600 text-white text-xs outline-none file:mr-2 file:py-1 file:px-2 file:rounded file:border-0 file:bg-gold-600 file:text-black file:text-xs file:font-bold">
                                     <input type="file" accept="image/*" id="audThumb" class="px-4 py-2.5 rounded-xl bg-forest-900 border border-forest-600 text-white text-xs outline-none file:mr-2 file:py-1 file:px-2 file:rounded file:border-0 file:bg-gold-600 file:text-black file:text-xs file:font-bold" title="Thumbnail/Cover (opsional)">
                                     <button type="submit" id="audSubmitBtn" class="sm:col-span-2 py-2.5 rounded-xl bg-gold-600 hover:bg-gold-500 text-black font-bold text-sm transition">Tambah Audio</button>
                                 </form>
@@ -5169,7 +5271,7 @@ async function loadAudioPlaylistData() {
                                                     <p class="text-[10px] text-gray-400">${(a.plays || 0).toLocaleString('id-ID')} pendengar${a.date ? ' · ' + a.date : ''}</p>
                                                     ${a.playlistId ? (() => { const pl = appData.audioPlaylists.find(p => p.id === a.playlistId); return pl ? `<span class="inline-block text-[9px] font-bold px-2 py-0.5 rounded-full bg-gold-600/20 text-gold-400 border border-gold-600/40 mt-1">🎧 ${pl.name}</span>` : ''; })() : ''}
                                                 </div>
-                                                <audio controls src="${a.data}" class="h-8 max-w-[220px] w-full sm:w-auto"></audio>
+                                                ${String(a.data || '').indexOf('fs:') === 0 ? `<button type="button" onclick="adminLoadAudio(${idx}, this)" class="px-3 py-1.5 rounded bg-forest-800 border border-gold-600/50 text-gold-400 text-xs font-semibold">▶ Putar</button>` : `<audio controls src="${a.data}" class="h-8 max-w-[220px] w-full sm:w-auto"></audio>`}
                                             </div>
                                             <div class="grid grid-cols-1 sm:grid-cols-3 gap-2">
                                                 <input type="text" value="${a.title}" id="audTitleEdit_${idx}" placeholder="Judul Audio" class="px-2 py-1.5 rounded bg-forest-800 border border-forest-600 text-xs text-white">
