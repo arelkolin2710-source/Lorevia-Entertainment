@@ -2,7 +2,7 @@
 /* ################ Rute awal ################ */
 // Rute aktif ditentukan dari alamat: /?p=toko  atau  /#loreviaadmin (dasbor admin, tanpa sandi)
 (function () {
-    var ROUTES = ["beranda", "gen-members", "pendaftaran-trainee", "pendaftaran-management", "cek-hasil", "about", "member", "toko", "checkout", "pengumuman", "achievement", "struktur", "guestbox", "video-playlist", "audio-playlist", "admin-dashboard"];
+    var ROUTES = ["beranda", "gen-members", "pendaftaran-trainee", "pendaftaran-management", "cek-hasil", "about", "member", "toko", "checkout", "pengumuman", "achievement", "history", "dispatch", "medpart", "struktur", "guestbox", "video-playlist", "audio-playlist", "admin-dashboard"];
     var p = new URLSearchParams(location.search).get('p');
     window.PAGE_ROUTE = location.hash === '#loreviaadmin' ? 'admin-dashboard' : (ROUTES.indexOf(p) >= 0 ? p : 'beranda');
 })();
@@ -13,7 +13,7 @@
 // Ikon diambil dari sprite assets/icons/sprite.svg (Material Design Icons, lisensi Apache 2.0).
 (function () {
     var SPRITE = '';  // sprite ikon ada di dalam index.html
-    var MAP = {"✨": "shimmer", "🌟": "star", "🌸": "flower", "🦋": "butterfly", "💛": "heart", "🎀": "ribbon", "🎧": "headphones", "🎬": "movie-open", "💬": "message-text", "🏆": "trophy", "🛍️": "shopping", "🛍": "shopping", "⚠️": "alert", "⚠": "alert", "🍀": "clover", "🌼": "flower-tulip", "🏠": "home", "💌": "email-heart-outline", "🔎": "magnify", "📣": "bullhorn", "📮": "mailbox", "🌿": "leaf", "🌱": "sprout", "🛡️": "shield-check", "🛡": "shield-check", "❤️": "heart", "❤": "heart", "🤍": "heart-outline", "🎉": "party-popper", "👁️": "eye", "👁": "eye", "🔒": "lock", "→": "arrow-right", "🔊": "volume-high", "🗓️": "calendar", "🗓": "calendar", "🔇": "volume-off", "⏳": "timer-sand", "📢": "bullhorn", "📄": "file-document", "❚❚": "pause", "🎵": "music-note", "🎟️": "ticket-percent", "🎟": "ticket-percent", "🔐": "lock", "📅": "calendar", "✓": "check", "🔍": "magnify"};
+    var MAP = {"✨": "shimmer", "🌟": "star", "🌸": "flower", "🦋": "butterfly", "💛": "heart", "🎀": "ribbon", "🎧": "headphones", "🎬": "movie-open", "💬": "message-text", "🏆": "trophy", "🛍️": "shopping", "🛍": "shopping", "⚠️": "alert", "⚠": "alert", "🍀": "clover", "🌼": "flower-tulip", "🏠": "home", "💌": "email-heart-outline", "🔎": "magnify", "📣": "bullhorn", "📮": "mailbox", "🌿": "leaf", "🌱": "sprout", "🛡️": "shield-check", "🛡": "shield-check", "❤️": "heart", "❤": "heart", "🤍": "heart-outline", "🎉": "party-popper", "👁️": "eye", "👁": "eye", "🔒": "lock", "→": "arrow-right", "🔊": "volume-high", "🗓️": "calendar", "🗓": "calendar", "🔇": "volume-off", "⏳": "timer-sand", "📢": "bullhorn", "📄": "file-document", "❚❚": "pause", "🎵": "music-note", "🎟️": "ticket-percent", "🎟": "ticket-percent", "🔐": "lock", "📅": "calendar", "✓": "check", "🔍": "magnify", "📜": "history", "📰": "article", "🤝": "people", "▶": "play-circle"};
     var COLORS = {"❤️": "#ef4444", "❤": "#ef4444", "⚠️": "#f59e0b", "⚠": "#f59e0b"};
     function esc(s) { return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); }
     var keys = Object.keys(MAP).sort(function (a, b) { return b.length - a.length; }).map(esc);
@@ -38,6 +38,7 @@
     function plain(s) { return String(s == null ? '' : s).replace(RE, '').replace(/ {2,}/g, ' ').trim(); }
 
     function convertText(node) {
+        if (node.parentNode && node.parentNode.closest && node.parentNode.closest('[contenteditable="true"]')) return;
         var text = node.nodeValue;
         RE.lastIndex = 0;
         if (!RE.test(text)) return;
@@ -225,7 +226,7 @@
                     { id: 'name', sys: 'name', type: 'text', label: 'Nama Panjang', required: true },
                     { id: 'stageName', sys: 'stageName', type: 'text', label: 'Nama Panggung', required: true },
                     { id: 'faceClaim', type: 'text', label: 'Face Claim', required: true, help: 'Contoh: Jisoo Blackpink' },
-                    { id: 'tanggalLahir', sys: 'tanggalLahir', type: 'date', label: 'Tanggal Lahir', required: true, help: 'Dipakai juga untuk mengecek hasil seleksi.' },
+                    { id: 'tanggalLahir', sys: 'tanggalLahir', type: 'date', label: 'Tanggal Lahir', required: true },
                     { id: 'division', sys: 'division', type: 'division', label: 'Divisi', required: true },
                     { id: 'voice', type: 'file', label: 'Sample Suara (Audio/Video)', required: true, fileKinds: ['audio', 'video'], help: 'Unggah contoh suara/vokal kamu.' },
                     { id: 'reason', type: 'textarea', label: 'Alasan Masuk', required: true },
@@ -240,7 +241,7 @@
                     { id: 'name', sys: 'name', type: 'text', label: 'Nama Panjang', required: true },
                     { id: 'stageName', sys: 'stageName', type: 'text', label: 'Nama Panggung', required: true },
                     { id: 'line', type: 'text', label: 'Line', required: true, help: '2 digit terakhir tahun lahir + L, contoh kelahiran 2007 = 07L.' },
-                    { id: 'tanggalLahir', sys: 'tanggalLahir', type: 'date', label: 'Tanggal Lahir', required: true, help: 'Dipakai juga untuk mengecek hasil seleksi.' },
+                    { id: 'tanggalLahir', sys: 'tanggalLahir', type: 'date', label: 'Tanggal Lahir', required: true },
                     { id: 'division', sys: 'division', type: 'division', label: 'Divisi', required: true },
                     { id: 'fileSample', type: 'file', label: 'Sample Hasil Edit', required: true, fileKinds: ['image', 'video', 'pdf'], divisions: ['All Editor'], help: 'Contoh hasil editan sebagai portofolio.' },
                     { id: 'reason', type: 'textarea', label: 'Alasan Masuk', required: true },
@@ -262,6 +263,9 @@
             if (!appData.announcements) appData.announcements = [];
             if (!appData.adminStructure) appData.adminStructure = [];
             if (!appData.guestBoxes) appData.guestBoxes = [];
+            if (!appData.histories) appData.histories = [];
+            if (!appData.dispatches) appData.dispatches = [];
+            if (!appData.medparts) appData.medparts = [];
             // Hapus Founder atas nama Loren dari struktur
             appData.adminStructure = appData.adminStructure.filter(a => !(a && String(a.name || '').trim().toLowerCase() === 'loren'));
             if (!appData.slotUsage) appData.slotUsage = [];
@@ -332,7 +336,8 @@
     const ARRAY_KEYS = [
         'announcements', 'achievements', 'adminStructure', 'members', 'managementList',
         'traineeSubmissions', 'managementSubmissions', 'guestBoxes', 'products', 'orders',
-        'promos', 'videoPlaylists', 'audioPlaylists', 'videos', 'audios', 'forms', 'slotUsage'
+        'promos', 'videoPlaylists', 'audioPlaylists', 'videos', 'audios', 'forms', 'slotUsage',
+        'histories', 'dispatches', 'medparts'
     ];
     // Pengaturan umum, disimpan di satu dokumen settings/main.
     const SETTING_KEYS = ['genLabel', 'registrationOpen', 'resultsAnnounceDate'];
@@ -777,7 +782,7 @@ async function kirimKeSheet(type, data) {
 
         window.addEventListener('beforeunload', persistState);
 
-        const ROUTE_TITLES = {"beranda": "Lorevia Entertainment 🌿 | Agensi Terbaik di RVN Sepanjang Masa", "gen-members": "Member Generasi - Lorevia Entertainment", "pendaftaran-trainee": "Pendaftaran Trainee - Lorevia Entertainment", "pendaftaran-management": "Pendaftaran management - Lorevia Entertainment", "cek-hasil": "Cek Hasil Seleksi - Lorevia Entertainment", "about": "About - Lorevia Entertainment", "member": "Member - Lorevia Entertainment", "toko": "Toko - Lorevia Entertainment", "checkout": "Checkout - Lorevia Entertainment", "pengumuman": "Pengumuman - Lorevia Entertainment", "achievement": "Achievement - Lorevia Entertainment", "struktur": "Struktur Admin - Lorevia Entertainment", "guestbox": "Guest Box - Lorevia Entertainment", "video-playlist": "Video Playlist - Lorevia Entertainment", "audio-playlist": "Audio Playlist - Lorevia Entertainment", "admin-dashboard": "Dasbor Admin - Lorevia Entertainment"};
+        const ROUTE_TITLES = {"beranda": "Lorevia Entertainment 🌿 | Agensi Terbaik di RVN Sepanjang Masa", "gen-members": "Member Generasi - Lorevia Entertainment", "pendaftaran-trainee": "Pendaftaran Trainee - Lorevia Entertainment", "pendaftaran-management": "Pendaftaran management - Lorevia Entertainment", "cek-hasil": "Cek Hasil Seleksi - Lorevia Entertainment", "about": "About - Lorevia Entertainment", "member": "Member - Lorevia Entertainment", "toko": "Toko - Lorevia Entertainment", "checkout": "Checkout - Lorevia Entertainment", "pengumuman": "Pengumuman - Lorevia Entertainment", "achievement": "Achievement - Lorevia Entertainment", "struktur": "Struktur Admin - Lorevia Entertainment", "guestbox": "Guest Box - Lorevia Entertainment", "history": "History & Kerja Sama - Lorevia Entertainment", "dispatch": "Dispatch Resmi - Lorevia Entertainment", "medpart": "Official Promote Medpart - Lorevia Entertainment", "video-playlist": "Video Playlist - Lorevia Entertainment", "audio-playlist": "Audio Playlist - Lorevia Entertainment", "admin-dashboard": "Dasbor Admin - Lorevia Entertainment"};
 
         let currentRoute = window.PAGE_ROUTE || 'beranda';
         // Akses admin: buka  situs.com/#loreviaadmin  (tanpa sandi). Status disimpan di sessionStorage
@@ -818,6 +823,7 @@ async function kirimKeSheet(type, data) {
 
         function switchAdminTab(tab) {
             adminTab = tab;
+            adminEdit = null;
             renderView();
         }
 
@@ -910,41 +916,6 @@ async function kirimKeSheet(type, data) {
             showRoute(r, false);
         });
 
-        // Animasikan teks & gambar muncul satu per satu setiap kali halaman/tampilan berganti
-        function animatePageReveal() {
-            const content = document.getElementById('appContent');
-            if (!content) return;
-            const wrapper = content.firstElementChild;
-            if (!wrapper) return;
-
-            let targets = Array.from(wrapper.children);
-            if (targets.length === 0) targets = [wrapper];
-
-            // Kalau cuma ada 1-2 blok besar, turun satu level lagi supaya
-            // animasinya benar-benar terasa "satu per satu", bukan sekali blok besar
-            if (targets.length <= 2) {
-                const nested = [];
-                targets.forEach(t => nested.push(...Array.from(t.children)));
-                if (nested.length > targets.length) targets = nested;
-            }
-
-            targets.forEach((el, i) => {
-                el.classList.remove('reveal-item');
-                void el.offsetWidth; // reset supaya animasi jalan lagi tiap ganti halaman
-                el.classList.add('reveal-item');
-                el.style.animationDelay = `${Math.min(i, 10) * 90}ms`;
-            });
-
-            // Gambar dianimasikan tersendiri (fade + scale) agar makin terasa hidup
-            const imgs = wrapper.querySelectorAll('img');
-            imgs.forEach((img, i) => {
-                img.classList.remove('reveal-img');
-                void img.offsetWidth;
-                img.classList.add('reveal-img');
-                img.style.animationDelay = `${Math.min(i, 12) * 80}ms`;
-            });
-        }
-
         // Render Views
 
         // Form Submission Handlers
@@ -1009,7 +980,7 @@ async function kirimKeSheet(type, data) {
         }
         function adminActionFailed(err) {
             console.error(err);
-            alert('Gagal menyimpan: ' + ((err && err.message) || 'terjadi kesalahan') + '\nPastikan file berupa gambar dan coba lagi.');
+            alert('Gagal menyimpan: ' + ((err && err.message) || 'terjadi kesalahan') + (err && err.plain ? '' : '\nPastikan file berupa gambar dan coba lagi.'));
         }
 
         // ===== TOKO: format harga & keranjang belanja =====
@@ -2326,25 +2297,38 @@ async function kirimKeSheet(type, data) {
             renderView();
         }
 
-        function checkSelectionResult(e) {
+        // Samakan tulisan: huruf kecil, tanpa aksen, spasi ganda dibuang
+        function normText(v) {
+            return String(v == null ? '' : v).normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/\s+/g, ' ').trim();
+        }
+
+        // Cek hasil seleksi: cukup NAMA (nama panjang ATAU nama panggilan/panggung) + DIVISI.
+        async function checkSelectionResult(e) {
             e.preventDefault();
-            const name = document.getElementById('cekName').value.trim().toLowerCase();
-            const tanggalLahir = document.getElementById('cekTanggalLahir').value.trim();
-            const divisi = document.getElementById('cekDivisi').value.trim().toLowerCase();
             const resultBox = document.getElementById('cekHasilResult');
+            const btn = e.target.querySelector('button[type="submit"]');
+            const name = normText(document.getElementById('cekName').value);
+            const divisi = normText(document.getElementById('cekDivisi').value);
+            if (!name || !divisi) {
+                resultBox.innerHTML = '<div class="bg-forest-800/80 p-5 rounded-2xl border border-yellow-500/50 text-center text-sm text-yellow-300">Isi nama dan divisi dulu ya.</div>';
+                return;
+            }
+            const label = btn ? btn.innerHTML : '';
+            if (btn) { btn.disabled = true; btn.textContent = 'Mencari data...'; }
+            try {
+                // pastikan data pendaftar terbaru sudah dimuat dari database
+                if (window.loreviaDbReady) await window.loreviaDbReady;
+                if (window.loreviaDbEnsure) await window.loreviaDbEnsure('cek-hasil');
+            } catch (err) { console.error(err); }
+            if (btn) { btn.disabled = false; btn.innerHTML = label; }
 
-            const foundTrainee = appData.traineeSubmissions.find(t =>
-                (t.name || '').trim().toLowerCase() === name &&
-                (t.tanggalLahir || '') === tanggalLahir &&
-                (t.div || '').trim().toLowerCase() === divisi
-            );
-            const foundmanagement = !foundTrainee ? appData.managementSubmissions.find(s =>
-                (s.name || '').trim().toLowerCase() === name &&
-                (s.tanggalLahir || '') === tanggalLahir &&
-                (s.pos || '').trim().toLowerCase() === divisi
-            ) : null;
+            const nameMatch = s => normText(s.name) === name || normText(s.stageName) === name;
+            const trainees = (appData.traineeSubmissions || []).filter(t => nameMatch(t) && normText(t.div) === divisi)
+                .map(x => ({ type: 'trainee', item: x }));
+            const managers = (appData.managementSubmissions || []).filter(t => nameMatch(t) && normText(t.pos) === divisi)
+                .map(x => ({ type: 'management', item: x }));
+            const matches = trainees.concat(managers);
 
-            const found = foundTrainee || foundmanagement;
             const statusMap = {
                 pending: { label: 'Menunggu Seleksi', color: 'text-gray-300 bg-gray-700/40 border-gray-500', desc: 'Pendaftaranmu masih dalam antrian dan belum diproses oleh tim seleksi.' },
                 consideration: { label: 'Pertimbangan', color: 'text-yellow-400 bg-yellow-500/10 border-yellow-500/50', desc: 'Pendaftaranmu sedang dalam tahap pertimbangan lebih lanjut oleh tim.' },
@@ -2352,40 +2336,41 @@ async function kirimKeSheet(type, data) {
                 rejected: { label: 'Tidak Lolos', color: 'text-red-400 bg-red-500/10 border-red-500/50', desc: 'Mohon maaf, pendaftaranmu belum berhasil kali ini. Jangan berkecil hati untuk mencoba lagi di kesempatan berikutnya.' }
             };
 
-            if (!found) {
+            if (!matches.length) {
+                const dbDown = window.loreviaDbStatus && !window.loreviaDbStatus.ok;
                 resultBox.innerHTML = `
-                    <div class="bg-forest-800/80 p-6 rounded-2xl border border-red-500/50 text-center">
+                    <div class="bg-forest-800/80 p-6 rounded-2xl border border-red-500/50 text-center space-y-1">
                         <p class="text-red-400 font-semibold">Data tidak ditemukan.</p>
-                        <p class="text-xs text-gray-400 mt-1">Pastikan Nama, Tanggal Lahir, dan Divisi diisi persis sama seperti saat mendaftar.</p>
-                    </div>
-                `;
+                        <p class="text-xs text-gray-400">Pastikan nama (nama panjang atau nama panggilan) dan divisi sama seperti saat mendaftar.</p>
+                        ${dbDown ? '<p class="text-xs text-yellow-300">Catatan: database online sedang tidak terhubung, coba muat ulang halaman lalu cek lagi.</p>' : ''}
+                    </div>`;
                 return;
             }
 
-            const foundType = foundTrainee ? 'trainee' : 'management';
-            if (!isResultAnnounced(foundType)) {
-                const dateStr = appData.resultsAnnounceDate[foundType];
-                const formattedDate = dateStr
-                    ? new Date(dateStr + 'T00:00:00').toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })
-                    : '';
-                resultBox.innerHTML = `
+            resultBox.innerHTML = matches.map(m => {
+                const found = m.item;
+                if (!isResultAnnounced(m.type)) {
+                    const dateStr = (appData.resultsAnnounceDate || {})[m.type];
+                    const formattedDate = dateStr
+                        ? new Date(dateStr + 'T00:00:00').toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })
+                        : 'waktu yang akan diumumkan';
+                    return `
                     <div class="bg-forest-800/80 p-8 rounded-3xl gold-border text-center">
                         <span class="text-5xl">🔒</span>
                         <h2 class="font-serif text-2xl font-bold gold-text mt-4">Hasil Belum Diumumkan</h2>
-                        <p class="text-sm text-gray-300 mt-3">Pendaftaranmu sudah tercatat, tapi hasil seleksi ${foundType === 'trainee' ? 'Trainee' : 'management'} baru akan diumumkan pada <strong class="text-gold-400">${formattedDate}</strong>. Silakan cek kembali setelah tanggal tersebut.</p>
-                    </div>
-                `;
-                return;
-            }
-
-            const st = statusMap[found.status || 'pending'];
-            resultBox.innerHTML = `
+                        <p class="text-sm text-gray-300 mt-3">Pendaftaranmu sudah tercatat, tapi hasil seleksi ${m.type === 'trainee' ? 'Trainee' : 'Management'} baru akan diumumkan pada <strong class="text-gold-400">${escHtml(formattedDate)}</strong>. Silakan cek kembali setelah tanggal tersebut.</p>
+                    </div>`;
+                }
+                const st = statusMap[found.status || 'pending'] || statusMap.pending;
+                const who = found.stageName && found.stageName !== found.name ? `${escHtml(found.name)} (${escHtml(found.stageName)})` : escHtml(found.name);
+                return `
                 <div class="bg-forest-800/80 p-6 rounded-2xl gold-border text-center space-y-2">
-                    <p class="text-sm text-gray-300">Halo, <strong class="text-gold-400">${found.name}</strong></p>
+                    <p class="text-sm text-gray-300">Halo, <strong class="text-gold-400">${who}</strong></p>
+                    <p class="text-xs text-gray-400">${m.type === 'trainee' ? 'Trainee' : 'Management'} · ${escHtml(m.type === 'trainee' ? found.div : found.pos)}</p>
                     <span class="inline-block px-4 py-1.5 rounded-full border text-sm font-bold ${st.color}">${st.label}</span>
                     <p class="text-xs text-gray-300 mt-2">${st.desc}</p>
-                </div>
-            `;
+                </div>`;
+            }).join('<div class="h-3"></div>');
         }
 
         async function submitGuest(e) {
@@ -2520,49 +2505,6 @@ async function kirimKeSheet(type, data) {
         function deletemanagementMember(idx) {
             if (confirm('Apakah Anda yakin ingin menghapus management ini?')) {
                 appData.managementList.splice(idx, 1);
-                saveAppData();
-                renderView();
-            }
-        }
-
-        async function addAnnouncement(e) {
-            e.preventDefault();
-            try {
-                const title = document.getElementById('annTitle').value;
-                const date = document.getElementById('annDate').value;
-                const content = document.getElementById('annContent').value;
-                const photoFile = document.getElementById('annPhoto').files[0];
-                const photoUrls = photoFile ? await uploadMediaFiles([photoFile], 'announcement_' + Date.now()) : [];
-                appData.announcements.unshift({ id: Date.now(), title, date, content, photo: photoUrls[0] || null });
-                await commitAdminChange('Pengumuman baru berhasil ditambahkan!');
-            } catch (err) { adminActionFailed(err); }
-        }
-
-        function deleteAnnouncement(idx) {
-            if (confirm('Apakah Anda yakin ingin menghapus pengumuman ini?')) {
-                appData.announcements.splice(idx, 1);
-                saveAppData();
-                renderView();
-            }
-        }
-
-        async function addAchievement(e) {
-            e.preventDefault();
-            try {
-                const title = document.getElementById('achTitle').value;
-                const year = document.getElementById('achYear').value;
-                const desc = document.getElementById('achDesc').value;
-                const achFile = document.getElementById('achFile').files[0];
-                const fileUrls = achFile ? await uploadMediaFiles([achFile], 'achievement_' + Date.now()) : [];
-                const isImg = achFile && achFile.type && achFile.type.startsWith('image/');
-                appData.achievements.unshift({ id: Date.now(), title, year, desc, file: fileUrls[0] || null, fileType: achFile ? (isImg ? 'image/jpeg' : achFile.type) : null });
-                await commitAdminChange('Penghargaan baru berhasil ditambahkan!');
-            } catch (err) { adminActionFailed(err); }
-        }
-
-        function deleteAchievement(idx) {
-            if (confirm('Apakah Anda yakin ingin menghapus penghargaan ini?')) {
-                appData.achievements.splice(idx, 1);
                 saveAppData();
                 renderView();
             }
@@ -2715,6 +2657,662 @@ function toggleMemberGroupName() {
             updateCartBadge();
             applyThemeIcon();
         };
+
+/* ################ Teks kaya ################ */
+// Teks kaya (seperti di Word): editor + pembersih (sanitizer) + tautan otomatis + pemutar YouTube.
+// Semua teks kaya disimpan sebagai HTML yang SUDAH DIBERSIHKAN, dan dibersihkan lagi saat ditampilkan.
+
+(function () {
+    const ALLOWED = { B: 1, STRONG: 1, I: 1, EM: 1, U: 1, S: 1, STRIKE: 1, BR: 1, P: 1, DIV: 1, SPAN: 1, H2: 1, H3: 1,
+        UL: 1, OL: 1, LI: 1, A: 1, BLOCKQUOTE: 1, FONT: 1, SUB: 1, SUP: 1, HR: 1 };
+    const DROP_WITH_CONTENT = { SCRIPT: 1, STYLE: 1, IFRAME: 1, OBJECT: 1, EMBED: 1, SVG: 1, MATH: 1, TEMPLATE: 1, NOSCRIPT: 1,
+        FORM: 1, INPUT: 1, BUTTON: 1, TEXTAREA: 1, SELECT: 1, LINK: 1, META: 1 };
+    const COLOR_RE = /^(#[0-9a-f]{3,8}|rgba?\(\s*\d{1,3}\s*,\s*\d{1,3}\s*,\s*\d{1,3}\s*(,\s*[\d.]+\s*)?\)|[a-z]{3,20})$/i;
+
+    function safeUrl(u) {
+        u = String(u || '').trim();
+        if (/^(https?:\/\/|mailto:|tel:)/i.test(u)) return u;
+        if (/^www\./i.test(u)) return 'https://' + u;
+        return '';
+    }
+
+    function cleanStyle(raw) {
+        const out = [];
+        String(raw || '').split(';').forEach(p => {
+            const i = p.indexOf(':');
+            if (i < 0) return;
+            const k = p.slice(0, i).trim().toLowerCase(), v = p.slice(i + 1).trim();
+            if (k === 'text-align' && /^(left|center|right|justify)$/i.test(v)) out.push('text-align:' + v.toLowerCase());
+            else if (k === 'color' && COLOR_RE.test(v)) out.push('color:' + v);
+            else if (k === 'font-weight' && /^(bold|700|800|900)$/i.test(v)) out.push('font-weight:700');
+            else if (k === 'font-style' && /^italic$/i.test(v)) out.push('font-style:italic');
+            else if (k === 'text-decoration' && /^(underline|line-through)$/i.test(v)) out.push('text-decoration:' + v.toLowerCase());
+        });
+        return out.join(';');
+    }
+
+    function cleanNode(node, outParent, doc) {
+        node.childNodes.forEach(ch => {
+            if (ch.nodeType === 3) { outParent.appendChild(doc.createTextNode(ch.nodeValue)); return; }
+            if (ch.nodeType !== 1) return;
+            const tag = ch.nodeName.toUpperCase();
+            if (DROP_WITH_CONTENT[tag]) return;
+            if (!ALLOWED[tag]) { cleanNode(ch, outParent, doc); return; }   // tag asing dibuang, isinya dipertahankan
+            const el = doc.createElement(tag.toLowerCase());
+            if (tag === 'A') {
+                const href = safeUrl(ch.getAttribute('href'));
+                if (!href) { cleanNode(ch, outParent, doc); return; }
+                el.setAttribute('href', href);
+                el.setAttribute('target', '_blank');
+                el.setAttribute('rel', 'noopener noreferrer nofollow');
+            }
+            if (tag === 'FONT') {
+                const c = ch.getAttribute('color');
+                if (c && COLOR_RE.test(c)) el.setAttribute('color', c);
+            }
+            const st = cleanStyle(ch.getAttribute('style'));
+            if (st && tag !== 'A') el.setAttribute('style', st);
+            cleanNode(ch, el, doc);
+            outParent.appendChild(el);
+        });
+    }
+
+    // Ubah alamat (http://..., www....) di dalam teks biasa jadi tautan yang bisa diklik.
+    const URL_RE = /((?:https?:\/\/|www\.)[^\s<>"']+)/gi;
+    function autolink(root, doc) {
+        const walker = doc.createTreeWalker(root, NodeFilter.SHOW_TEXT, null);
+        const list = [];
+        let n;
+        while ((n = walker.nextNode())) {
+            if (n.parentNode && n.parentNode.closest && n.parentNode.closest('a')) continue;
+            URL_RE.lastIndex = 0;
+            if (URL_RE.test(n.nodeValue)) list.push(n);
+        }
+        list.forEach(t => {
+            const text = t.nodeValue;
+            const frag = doc.createDocumentFragment();
+            let last = 0, m;
+            URL_RE.lastIndex = 0;
+            while ((m = URL_RE.exec(text))) {
+                let url = m[0], tail = '';
+                const mm = url.match(/[.,;:!?)\]}'"]+$/);
+                if (mm) { tail = mm[0]; url = url.slice(0, -tail.length); }
+                const href = safeUrl(url);
+                if (m.index > last) frag.appendChild(doc.createTextNode(text.slice(last, m.index)));
+                if (href) {
+                    const a = doc.createElement('a');
+                    a.setAttribute('href', href);
+                    a.setAttribute('target', '_blank');
+                    a.setAttribute('rel', 'noopener noreferrer nofollow');
+                    a.textContent = url;
+                    frag.appendChild(a);
+                    if (tail) frag.appendChild(doc.createTextNode(tail));
+                } else frag.appendChild(doc.createTextNode(m[0]));
+                last = m.index + m[0].length;
+            }
+            if (last < text.length) frag.appendChild(doc.createTextNode(text.slice(last)));
+            t.parentNode.replaceChild(frag, t);
+        });
+    }
+
+    const TAG_HINT = /<\/?(b|i|u|s|p|div|br|ul|ol|li|a|h2|h3|span|font|strong|em|blockquote|strike|sub|sup|hr)\b/i;
+
+    // Bersihkan HTML kiriman admin. Teks biasa (data lama) diubah jadi paragraf, baris baru jadi <br>.
+    window.cleanRich = function (html) {
+        html = String(html == null ? '' : html);
+        if (!TAG_HINT.test(html)) html = escHtml(html).replace(/\r?\n/g, '<br>');
+        const doc = document.implementation.createHTMLDocument('');
+        const src = doc.createElement('div');
+        src.innerHTML = html;               // dokumen terpisah: skrip/event tidak dijalankan
+        const out = doc.createElement('div');
+        cleanNode(src, out, doc);
+        return out.innerHTML;
+    };
+
+    // HTML siap tampil: dibersihkan + tautan otomatis.
+    window.renderRich = function (html) {
+        const doc = document.implementation.createHTMLDocument('');
+        const box = doc.createElement('div');
+        box.innerHTML = window.cleanRich(html);
+        autolink(box, doc);
+        return '<div class="rich-body">' + box.innerHTML + '</div>';
+    };
+
+    window.richPlainText = function (html) {
+        const doc = document.implementation.createHTMLDocument('');
+        const box = doc.createElement('div');
+        box.innerHTML = window.cleanRich(html);
+        return (box.textContent || '').replace(/ /g, ' ').trim();
+    };
+
+    // Tanggal: "2026-11-19" -> "19 November 2026"; teks lain ditampilkan apa adanya.
+    window.fmtDate = function (d) {
+        d = String(d == null ? '' : d);
+        if (/^\d{4}-\d{2}-\d{2}$/.test(d)) {
+            const t = new Date(d + 'T00:00:00');
+            if (!isNaN(t)) return t.toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' });
+        }
+        return d;
+    };
+
+    // ---------- YouTube ----------
+    window.youtubeId = function (url) {
+        url = String(url || '').trim();
+        let m = url.match(/(?:youtu\.be\/|youtube\.com\/(?:watch\?(?:.*&)?v=|embed\/|shorts\/|live\/|v\/))([A-Za-z0-9_-]{11})/i);
+        if (m) return m[1];
+        if (/^[A-Za-z0-9_-]{11}$/.test(url)) return url;
+        return '';
+    };
+    window.youtubeCardHtml = function (url) {
+        const id = window.youtubeId(url);
+        if (!id) return '';
+        return `<div class="yt-card" data-yt="${id}" onclick="playYoutube(this)" role="button" tabindex="0" aria-label="Putar video">
+            <img src="https://i.ytimg.com/vi/${id}/hqdefault.jpg" alt="Video YouTube" loading="lazy">
+            <span class="yt-play"><svg class="ico" aria-hidden="true"><use href="#play-circle"></use></svg></span>
+        </div>
+        <a href="https://www.youtube.com/watch?v=${id}" target="_blank" rel="noopener noreferrer" class="text-xs text-gold-400 underline">Buka di YouTube</a>`;
+    };
+    window.playYoutube = function (el) {
+        const id = el.getAttribute('data-yt');
+        if (!id) return;
+        el.innerHTML = `<iframe src="https://www.youtube-nocookie.com/embed/${id}?autoplay=1&rel=0&modestbranding=1" title="Video YouTube" allow="autoplay; encrypted-media; picture-in-picture; fullscreen" allowfullscreen referrerpolicy="strict-origin-when-cross-origin"></iframe>`;
+        el.removeAttribute('onclick');
+    };
+
+    // ---------- Editor ----------
+    const BTN = [
+        ['bold', '<b>B</b>', 'Tebal (Ctrl+B)'], ['italic', '<i>I</i>', 'Miring (Ctrl+I)'],
+        ['underline', '<u>U</u>', 'Garis bawah (Ctrl+U)'], ['strikeThrough', '<s>S</s>', 'Coret'],
+        '|',
+        ['h2', 'H1', 'Judul besar'], ['h3', 'H2', 'Judul kecil'], ['p', '¶', 'Paragraf biasa'],
+        '|',
+        ['insertUnorderedList', '• Daftar', 'Daftar poin'], ['insertOrderedList', '1. Daftar', 'Daftar nomor'],
+        ['blockquote', 'Kutip', 'Kutipan'],
+        '|',
+        ['justifyLeft', '⇤', 'Rata kiri'], ['justifyCenter', '↔', 'Rata tengah'], ['justifyRight', '⇥', 'Rata kanan'],
+        '|',
+        ['createLink', 'Link', 'Sisipkan tautan'], ['unlink', 'Hapus link', 'Hapus tautan'],
+        '|',
+        ['undo', '↶', 'Urungkan'], ['redo', '↷', 'Ulangi'], ['removeFormat', 'Bersihkan', 'Hapus format']
+    ];
+    const COLORS = ['#ffffff', '#fcd34d', '#f59e0b', '#ef4444', '#22c55e', '#38bdf8', '#a78bfa', '#f472b6'];
+
+    // id: id unik editor. initial: HTML awal. minH: tinggi minimum (px).
+    window.richEditorHtml = function (id, opts) {
+        opts = opts || {};
+        const btns = BTN.map(b => {
+            if (b === '|') return '<span class="re-sep"></span>';
+            return `<button type="button" class="re-btn" title="${b[2]}" onmousedown="event.preventDefault()" onclick="richCmd('${id}','${b[0]}')">${b[1]}</button>`;
+        }).join('');
+        const cols = COLORS.map(c => `<button type="button" class="re-color" title="Warna teks" style="background:${c}" onmousedown="event.preventDefault()" onclick="richColor('${id}','${c}')"></button>`).join('');
+        return `<div class="rich-editor" id="${id}_wrap">
+            <div class="re-toolbar">${btns}<span class="re-sep"></span>${cols}</div>
+            <div id="${id}" class="re-area" contenteditable="true" spellcheck="true" data-placeholder="${escHtml(opts.placeholder || 'Tulis di sini...')}"
+                 style="min-height:${opts.minH || 220}px" oninput="richUpdate('${id}')">${window.cleanRich(opts.initial || '')}</div>
+            <div class="re-foot">
+                <span id="${id}_count" class="text-[11px] text-gray-400">0 karakter</span>
+                <button type="button" class="re-toggle" onclick="richTogglePreview('${id}')">Sembunyikan pratinjau</button>
+            </div>
+            <div id="${id}_prev" class="re-preview"><p class="re-prev-label">Pratinjau (tampilan seperti di situs)</p><div id="${id}_prevbody" class="rich-body"></div></div>
+        </div>`;
+    };
+
+    window.richUpdate = function (id) {
+        const el = document.getElementById(id);
+        if (!el) return;
+        const body = document.getElementById(id + '_prevbody');
+        if (body) body.innerHTML = window.renderRich(el.innerHTML).replace(/^<div class="rich-body">|<\/div>$/g, '') ||
+            '<span class="text-gray-500 text-xs">(masih kosong)</span>';
+        const c = document.getElementById(id + '_count');
+        if (c) c.textContent = window.richPlainText(el.innerHTML).length + ' karakter';
+        el.classList.toggle('is-empty', !window.richPlainText(el.innerHTML) && !el.querySelector('li,hr'));
+    };
+    window.richInit = function (id) { window.richUpdate(id); };
+    window.richTogglePreview = function (id) {
+        const p = document.getElementById(id + '_prev');
+        if (!p) return;
+        const hide = !p.classList.contains('hidden');
+        p.classList.toggle('hidden', hide);
+        const b = document.querySelector('#' + id + '_wrap .re-toggle');
+        if (b) b.textContent = hide ? 'Tampilkan pratinjau' : 'Sembunyikan pratinjau';
+    };
+    window.richCmd = function (id, cmd) {
+        const el = document.getElementById(id);
+        if (!el) return;
+        el.focus();
+        try { document.execCommand('styleWithCSS', false, false); } catch (e) {}
+        if (cmd === 'h2' || cmd === 'h3' || cmd === 'p' || cmd === 'blockquote') {
+            document.execCommand('formatBlock', false, cmd === 'p' ? 'p' : cmd);
+        } else if (cmd === 'createLink') {
+            const u = prompt('Alamat tautan (contoh: https://youtube.com/...)', 'https://');
+            if (u && safeUrl(u)) document.execCommand('createLink', false, safeUrl(u));
+        } else {
+            document.execCommand(cmd, false, null);
+        }
+        window.richUpdate(id);
+    };
+    window.richColor = function (id, color) {
+        const el = document.getElementById(id);
+        if (!el) return;
+        el.focus();
+        try { document.execCommand('styleWithCSS', false, false); } catch (e) {}
+        document.execCommand('foreColor', false, color);
+        window.richUpdate(id);
+    };
+    // Isi editor (HTML bersih). Kosong jika tidak ada teks.
+    window.richGet = function (id) {
+        const el = document.getElementById(id);
+        if (!el) return '';
+        if (!window.richPlainText(el.innerHTML) && !el.querySelector('li,hr')) return '';
+        return window.cleanRich(el.innerHTML);
+    };
+    window.richSet = function (id, html) {
+        const el = document.getElementById(id);
+        if (el) { el.innerHTML = window.cleanRich(html || ''); window.richUpdate(id); }
+    };
+
+    // Tempel: pertahankan format dasar (bold/italic/dll) tapi buang sisanya.
+    document.addEventListener('paste', function (e) {
+        const t = e.target && e.target.closest && e.target.closest('.re-area');
+        if (!t) return;
+        e.preventDefault();
+        const cd = e.clipboardData || window.clipboardData;
+        const html = cd.getData('text/html');
+        const txt = cd.getData('text/plain');
+        if (html) document.execCommand('insertHTML', false, window.cleanRich(html));
+        else document.execCommand('insertText', false, txt);
+        window.richUpdate(t.id);
+    });
+})();
+
+
+/* ################ Efek tampilan ################ */
+// Efek tampilan: item muncul satu per satu saat digeser (scroll) + animasi pohon di halaman Struktur.
+(function () {
+    const reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    let io = null, treeCleanup = null;
+
+    function isGroup(el) {
+        return el.matches && el.matches('.space-y-3, .space-y-4, .space-y-5, .space-y-6, .grid, [data-reveal-group]');
+    }
+    function collect(el, depth, out) {
+        if (el.hasAttribute('data-no-reveal')) return;
+        const kids = Array.from(el.children);
+        if (depth > 0 && !(isGroup(el) && kids.length > 1)) { out.push(el); return; }
+        if (!kids.length) { out.push(el); return; }
+        kids.forEach(k => collect(k, depth + 1 > 3 ? 3 : depth + 1, out));
+    }
+
+    window.animatePageReveal = function () {
+        if (io) { io.disconnect(); io = null; }
+        if (treeCleanup) { treeCleanup(); treeCleanup = null; }
+        document.querySelectorAll('.re-area').forEach(el => { if (window.richUpdate) window.richUpdate(el.id); });
+        if (typeof currentRoute !== 'undefined' && currentRoute === 'admin-dashboard') return;   // dasbor admin tanpa animasi
+        const content = document.getElementById('appContent');
+        if (!content || !content.firstElementChild) return;
+        const targets = [];
+        collect(content.firstElementChild, 0, targets);
+        if (targets.length === 0) return;
+
+        if (reduce || !('IntersectionObserver' in window)) { targets.forEach(t => t.classList.add('rv', 'rv-in')); initTree(content); return; }
+
+        const dirs = ['rv-up', 'rv-left', 'rv-right', 'rv-zoom'];
+        targets.forEach((t, i) => {
+            t.classList.remove('rv-in');
+            t.classList.add('rv');
+            const d = t.getAttribute('data-reveal');
+            t.classList.add(d ? 'rv-' + d : 'rv-up');
+        });
+        let batch = 0, batchTimer = null;
+        io = new IntersectionObserver(entries => {
+            entries.filter(e => e.isIntersecting).forEach(en => {
+                const el = en.target;
+                el.style.transitionDelay = (batch * 110) + 'ms';
+                batch++;
+                requestAnimationFrame(() => el.classList.add('rv-in'));
+                io.unobserve(el);
+            });
+            clearTimeout(batchTimer);
+            batchTimer = setTimeout(() => { batch = 0; }, 160);
+        }, { threshold: 0.08, rootMargin: '0px 0px -6% 0px' });
+        targets.forEach(t => io.observe(t));
+        // jaring pengaman: kalau ada yang belum muncul setelah 6 detik, tampilkan
+        setTimeout(() => targets.forEach(t => t.classList.add('rv-in')), 6000);
+        initTree(content);
+    };
+
+    // ===== Pohon struktur =====
+    function initTree(content) {
+        const tree = content.querySelector('.org-tree');
+        if (!tree) return;
+        const trunk = tree.querySelector('.org-trunk-fill');
+        function update() {
+            const r = tree.getBoundingClientRect();
+            const vh = window.innerHeight || 800;
+            const p = Math.max(0, Math.min(1, (vh * 0.85 - r.top) / Math.max(1, r.height)));
+            if (trunk) trunk.style.transform = 'scaleY(' + p.toFixed(3) + ')';
+        }
+        let raf = 0;
+        const onScroll = () => { if (!raf) raf = requestAnimationFrame(() => { raf = 0; update(); }); };
+        window.addEventListener('scroll', onScroll, true);
+        window.addEventListener('resize', onScroll);
+        update();
+        const items = tree.querySelectorAll('.org-level, .org-roots, .org-crown');
+        if (reduce || !('IntersectionObserver' in window)) { items.forEach(i => i.classList.add('is-in')); }
+        else {
+            const tio = new IntersectionObserver(es => {
+                es.forEach(e => { if (e.isIntersecting) { e.target.classList.add('is-in'); tio.unobserve(e.target); } });
+            }, { threshold: 0.2, rootMargin: '0px 0px -8% 0px' });
+            items.forEach(i => tio.observe(i));
+            setTimeout(() => items.forEach(i => i.classList.add('is-in')), 9000);
+            const prev = treeCleanup;
+            treeCleanup = () => { tio.disconnect(); window.removeEventListener('scroll', onScroll, true); window.removeEventListener('resize', onScroll); if (prev) prev(); };
+            return;
+        }
+        treeCleanup = () => { window.removeEventListener('scroll', onScroll, true); window.removeEventListener('resize', onScroll); };
+    }
+})();
+
+
+/* ################ Admin konten ################ */
+// Dasbor Admin: Pengumuman, Penghargaan, History & Kerja Sama, Dispatch Resmi, Official Promote Medpart.
+// Semua isi tulisan memakai editor teks kaya (tebal, miring, dll) dengan pratinjau; foto otomatis diperkecil (maks. 600 KB).
+
+let adminEdit = null;   // { type, idx } saat sedang mengedit item yang sudah ada
+const ADMIN_LISTS = { announce: 'announcements', achieve: 'achievements', history: 'histories', dispatch: 'dispatches', medpart: 'medparts' };
+const A_INP = 'w-full px-4 py-2.5 rounded-xl bg-forest-900 border border-forest-600 text-white text-sm outline-none';
+const A_FILE = 'w-full px-4 py-2.5 rounded-xl bg-forest-900 border border-forest-600 text-white text-xs outline-none file:mr-2 file:py-1 file:px-2 file:rounded file:border-0 file:bg-gold-600 file:text-black file:text-xs file:font-bold';
+const A_BTN = 'w-full py-2.5 rounded-xl bg-gold-600 hover:bg-gold-500 text-black font-bold text-sm transition';
+const A_LBL = 'block text-xs font-semibold text-gold-400 mb-1';
+
+function adminEditing(type) {
+    if (!adminEdit || adminEdit.type !== type) return null;
+    return (appData[ADMIN_LISTS[type]] || [])[adminEdit.idx] || null;
+}
+function startAdminEdit(type, idx) {
+    adminEdit = { type, idx };
+    renderView();
+    const f = document.getElementById('form_' + type);
+    if (f) f.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+function cancelAdminEdit() { adminEdit = null; renderView(); }
+function adminFail(msg) { return Object.assign(new Error(msg), { plain: true }); }
+function adminDelete(type, idx, label) {
+    if (!confirm('Apakah Anda yakin ingin menghapus ' + label + ' ini?')) return;
+    appData[ADMIN_LISTS[type]].splice(idx, 1);
+    if (adminEdit && adminEdit.type === type) adminEdit = null;
+    saveAppData();
+    renderView();
+}
+const deleteAnnouncement = i => adminDelete('announce', i, 'pengumuman');
+const deleteAchievement = i => adminDelete('achieve', i, 'penghargaan');
+const deleteHistory = i => adminDelete('history', i, 'data history');
+const deleteDispatch = i => adminDelete('dispatch', i, 'berita');
+const deleteMedpart = i => adminDelete('medpart', i, 'promosi medpart');
+
+async function adminPhoto(inputId, prefix) {
+    const f = document.getElementById(inputId) && document.getElementById(inputId).files[0];
+    if (!f) return null;
+    if (!f.type || !f.type.startsWith('image/')) throw adminFail('File foto harus berupa gambar.');
+    return (await uploadMediaFiles([f], prefix + '_' + Date.now()))[0] || null;
+}
+
+// Bagian atas form: judul + tombol batal saat mengedit
+function formHead(type, title, editing) {
+    return `<div class="flex justify-between items-center gap-3">
+        <h4 class="font-serif text-lg font-bold text-gold-400">${editing ? 'Edit: ' + title : title}</h4>
+        ${editing ? `<button type="button" onclick="cancelAdminEdit()" class="text-xs text-gray-300 underline">Batal edit</button>` : ''}
+    </div>`;
+}
+function photoField(id, existing) {
+    return `<div><label class="${A_LBL}">Foto ${existing ? '(kosongkan jika tidak ingin mengganti)' : '(opsional)'}</label>
+        <input type="file" accept="image/*" id="${id}" class="${A_FILE}">
+        <p class="text-[11px] text-gray-400 mt-1">Foto otomatis diperkecil, maks. 600 KB per file.${existing ? ' Foto saat ini: <img src="' + escHtml(existing) + '" class="inline-block w-8 h-8 rounded object-cover align-middle">' : ''}</p></div>`;
+}
+function itemRow(thumb, title, sub, type, idx, delFn) {
+    return `<div class="bg-forest-900/80 p-3 rounded-xl border border-forest-700 flex justify-between items-center gap-3 text-sm">
+        <div class="flex items-center gap-3 min-w-0">
+            ${thumb ? `<img src="${escHtml(thumb)}" class="w-10 h-10 rounded object-cover shrink-0">` : ''}
+            <div class="min-w-0"><p class="font-bold text-gold-400 truncate">${escHtml(title)}</p><p class="text-[10px] text-gray-400 truncate">${escHtml(sub)}</p></div>
+        </div>
+        <div class="flex gap-3 shrink-0">
+            <button onclick="startAdminEdit('${type}', ${idx})" class="text-gold-400 hover:text-gold-300 text-xs">Edit</button>
+            <button onclick="${delFn}(${idx})" class="text-red-400 hover:text-red-300 text-xs">Hapus</button>
+        </div>
+    </div>`;
+}
+const listBox = rows => `<div class="space-y-2 max-h-80 overflow-y-auto pr-2">${rows || '<p class="text-sm text-gray-400 text-center py-4">Belum ada data.</p>'}</div>`;
+const cardBox = inner => `<div class="bg-forest-800/80 p-6 rounded-2xl gold-border shadow-xl space-y-4">${inner}</div>`;
+
+// ---------------- Pengumuman & Penghargaan ----------------
+function renderAnnounceTab() {
+    const ea = adminEditing('announce'), eh = adminEditing('achieve');
+    return `<div class="space-y-6">
+        ${cardBox(`
+            ${formHead('announce', 'Pengumuman', ea)}
+            <form id="form_announce" onsubmit="saveAnnouncement(event)" class="space-y-3">
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div><label class="${A_LBL}">Judul</label><input type="text" id="annTitle" required value="${escHtml(ea ? ea.title : '')}" class="${A_INP}"></div>
+                    <div><label class="${A_LBL}">Tanggal ${ea && !/^\d{4}-/.test(ea.date || '') ? '(sebelumnya: ' + escHtml(ea.date) + ')' : ''}</label><input type="date" id="annDate" ${ea ? '' : 'required'} value="${ea && /^\d{4}-\d{2}-\d{2}$/.test(ea.date || '') ? ea.date : ''}" class="${A_INP}"></div>
+                </div>
+                <div><label class="${A_LBL}">Isi Pengumuman</label>${richEditorHtml('annContent', { initial: ea ? ea.content : '', placeholder: 'Tulis pengumuman... (link otomatis jadi tautan)', minH: 240 })}</div>
+                ${photoField('annPhoto', ea && ea.photo)}
+                <button type="submit" class="${A_BTN}">${ea ? 'Simpan Perubahan' : 'Tambah Pengumuman'}</button>
+            </form>
+            ${listBox(appData.announcements.map((a, i) => itemRow(a.photo, a.title, fmtDate(a.date), 'announce', i, 'deleteAnnouncement')).join(''))}
+        `)}
+        ${cardBox(`
+            ${formHead('achieve', 'Penghargaan / Achievement', eh)}
+            <form id="form_achieve" onsubmit="saveAchievement(event)" class="space-y-3">
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div><label class="${A_LBL}">Judul Penghargaan</label><input type="text" id="achTitle" required value="${escHtml(eh ? eh.title : '')}" class="${A_INP}"></div>
+                    <div><label class="${A_LBL}">Tahun</label><input type="text" id="achYear" required placeholder="cth: 2026" value="${escHtml(eh ? eh.year : '')}" class="${A_INP}"></div>
+                </div>
+                <div><label class="${A_LBL}">Deskripsi</label>${richEditorHtml('achDesc', { initial: eh ? eh.desc : '', placeholder: 'Ceritakan penghargaannya...', minH: 200 })}</div>
+                <div><label class="${A_LBL}">Foto sertifikat/piala atau file bukti (gambar/PDF) ${eh ? '(kosongkan jika tidak ingin mengganti)' : ''}</label>
+                    <input type="file" accept="image/*,.pdf" id="achFile" class="${A_FILE}">
+                    <p class="text-[11px] text-gray-400 mt-1">Foto otomatis diperkecil, maks. 600 KB per file.</p></div>
+                <button type="submit" class="${A_BTN}">${eh ? 'Simpan Perubahan' : 'Tambah Penghargaan'}</button>
+            </form>
+            ${listBox(appData.achievements.map((a, i) => itemRow(a.fileType && a.fileType.startsWith('image/') ? a.file : '', a.title, a.year, 'achieve', i, 'deleteAchievement')).join(''))}
+        `)}
+    </div>`;
+}
+
+async function saveAnnouncement(e) {
+    e.preventDefault();
+    try {
+        const ed = adminEditing('announce');
+        const title = document.getElementById('annTitle').value.trim();
+        const date = document.getElementById('annDate').value || (ed ? ed.date : '');
+        const content = richGet('annContent');
+        if (!content) throw adminFail('Isi pengumuman belum diisi.');
+        const photo = await adminPhoto('annPhoto', 'announcement');
+        if (ed) { Object.assign(ed, { title, date, content }); if (photo) ed.photo = photo; }
+        else appData.announcements.unshift({ id: Date.now(), title, date, content, photo: photo || null });
+        const wasEdit = !!ed; adminEdit = null;
+        await commitAdminChange(wasEdit ? 'Pengumuman berhasil diperbarui!' : 'Pengumuman baru berhasil ditambahkan!');
+    } catch (err) { adminActionFailed(err); }
+}
+
+async function saveAchievement(e) {
+    e.preventDefault();
+    try {
+        const ed = adminEditing('achieve');
+        const title = document.getElementById('achTitle').value.trim();
+        const year = document.getElementById('achYear').value.trim();
+        const desc = richGet('achDesc');
+        if (!desc) throw adminFail('Deskripsi penghargaan belum diisi.');
+        const f = document.getElementById('achFile').files[0];
+        const url = f ? (await uploadMediaFiles([f], 'achievement_' + Date.now()))[0] : null;
+        const isImg = f && f.type && f.type.startsWith('image/');
+        if (ed) {
+            Object.assign(ed, { title, year, desc });
+            if (f) { ed.file = url; ed.fileType = isImg ? 'image/jpeg' : f.type; }
+        } else {
+            appData.achievements.unshift({ id: Date.now(), title, year, desc, file: url || null, fileType: f ? (isImg ? 'image/jpeg' : f.type) : null });
+        }
+        const wasEdit = !!ed; adminEdit = null;
+        await commitAdminChange(wasEdit ? 'Penghargaan berhasil diperbarui!' : 'Penghargaan baru berhasil ditambahkan!');
+    } catch (err) { adminActionFailed(err); }
+}
+
+// ---------------- History & Kerja Sama ----------------
+let histBlockSeq = 0;
+function histBlockHtml(heading, body) {
+    const id = 'hc_' + (++histBlockSeq);
+    return `<div class="hist-block bg-forest-900/60 p-3 rounded-xl border border-forest-700 space-y-2">
+        <div class="flex gap-2 items-center">
+            <input type="text" class="hc-heading ${A_INP}" placeholder="Judul bagian (opsional), cth: Awal Kerja Sama" value="${escHtml(heading || '')}">
+            <button type="button" onclick="histRemoveBlock(this)" class="text-red-400 hover:text-red-300 text-xs shrink-0">Hapus bagian</button>
+        </div>
+        ${richEditorHtml(id, { initial: body || '', placeholder: 'Isi bagian ini...', minH: 150 })}
+    </div>`;
+}
+function histAddBlock() {
+    const box = document.getElementById('histBlocks');
+    if (!box) return;
+    if (box.querySelectorAll('.hist-block').length >= 12) { alert('Maksimal 12 bagian isi.'); return; }
+    box.insertAdjacentHTML('beforeend', histBlockHtml('', ''));
+    const last = box.lastElementChild.querySelector('.re-area');
+    if (last) richUpdate(last.id);
+}
+function histRemoveBlock(btn) { const b = btn.closest('.hist-block'); if (b) b.remove(); }
+
+function renderHistoryTab() {
+    const e = adminEditing('history');
+    const blocks = e ? (e.contents || []) : [];
+    return `<div class="space-y-6">
+        ${cardBox(`
+            ${formHead('history', 'History, Kerja Sama & Medpart', e)}
+            <form id="form_history" onsubmit="saveHistory(event)" class="space-y-3">
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div><label class="${A_LBL}">Judul</label><input type="text" id="hTitle" required value="${escHtml(e ? e.title : '')}" class="${A_INP}"></div>
+                    <div><label class="${A_LBL}">Tanggal</label><input type="date" id="hDate" ${e ? '' : 'required'} value="${e && /^\d{4}-\d{2}-\d{2}$/.test(e.date || '') ? e.date : ''}" class="${A_INP}"></div>
+                    <div><label class="${A_LBL}">Kategori</label>
+                        <select id="hCategory" class="${A_INP}">${['History', 'Kerja Sama', 'Medpart'].map(c => `<option ${e && e.category === c ? 'selected' : ''}>${c}</option>`).join('')}</select></div>
+                    <div><label class="${A_LBL}">Nama agensi / mitra (opsional)</label><input type="text" id="hPartner" value="${escHtml(e ? e.partner || '' : '')}" placeholder="cth: Nama agensi yang bekerja sama" class="${A_INP}"></div>
+                </div>
+                ${photoField('hPhoto', e && e.photo)}
+                <div><label class="${A_LBL}">Cerita latar belakang</label>${richEditorHtml('hStory', { initial: e ? e.story : '', placeholder: 'Ceritakan latar belakang agensi / kerja sama ini...', minH: 220 })}</div>
+                <div class="space-y-2">
+                    <div class="flex justify-between items-center"><label class="${A_LBL} mb-0">Isi tambahan (bisa lebih dari satu)</label>
+                        <button type="button" onclick="histAddBlock()" class="px-3 py-1 rounded-lg bg-forest-700 text-gold-400 text-xs font-bold hover:bg-gold-600 hover:text-black">+ Tambah bagian isi</button></div>
+                    <div id="histBlocks" class="space-y-3">${blocks.map(b => histBlockHtml(b.heading, b.body)).join('')}</div>
+                </div>
+                <button type="submit" class="${A_BTN}">${e ? 'Simpan Perubahan' : 'Tambahkan'}</button>
+            </form>
+            ${listBox((appData.histories || []).map((h, i) => itemRow(h.photo, h.title, (h.category || '') + ' · ' + fmtDate(h.date), 'history', i, 'deleteHistory')).join(''))}
+        `)}
+    </div>`;
+}
+async function saveHistory(e) {
+    e.preventDefault();
+    try {
+        const ed = adminEditing('history');
+        const title = document.getElementById('hTitle').value.trim();
+        const date = document.getElementById('hDate').value || (ed ? ed.date : '');
+        const category = document.getElementById('hCategory').value;
+        const partner = document.getElementById('hPartner').value.trim();
+        const story = richGet('hStory');
+        const contents = Array.from(document.querySelectorAll('#histBlocks .hist-block')).map(b => ({
+            heading: b.querySelector('.hc-heading').value.trim(),
+            body: richGet(b.querySelector('.re-area').id)
+        })).filter(c => c.heading || c.body);
+        if (!story && !contents.length) throw adminFail('Isi cerita latar belakang atau minimal satu bagian isi.');
+        const photo = await adminPhoto('hPhoto', 'history');
+        const data = { title, date, category, partner, story, contents };
+        if (ed) { Object.assign(ed, data); if (photo) ed.photo = photo; }
+        else appData.histories.unshift({ id: Date.now(), ...data, photo: photo || null });
+        const wasEdit = !!ed; adminEdit = null;
+        await commitAdminChange(wasEdit ? 'Data berhasil diperbarui!' : 'Data berhasil ditambahkan!');
+    } catch (err) { adminActionFailed(err); }
+}
+
+// ---------------- Dispatch Resmi ----------------
+function renderDispatchTab() {
+    const e = adminEditing('dispatch');
+    return `<div class="space-y-6">
+        ${cardBox(`
+            ${formHead('dispatch', 'Dispatch / Berita Resmi', e)}
+            <form id="form_dispatch" onsubmit="saveDispatch(event)" class="space-y-3">
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div><label class="${A_LBL}">Judul berita</label><input type="text" id="dTitle" required value="${escHtml(e ? e.title : '')}" class="${A_INP}"></div>
+                    <div><label class="${A_LBL}">Tanggal</label><input type="date" id="dDate" ${e ? '' : 'required'} value="${e && /^\d{4}-\d{2}-\d{2}$/.test(e.date || '') ? e.date : ''}" class="${A_INP}"></div>
+                </div>
+                ${photoField('dPhoto', e && e.photo)}
+                <div><label class="${A_LBL}">Isi berita (link seperti https://... otomatis jadi tautan)</label>${richEditorHtml('dContent', { initial: e ? e.content : '', placeholder: 'Tulis berita resmi...', minH: 260 })}</div>
+                <button type="submit" class="${A_BTN}">${e ? 'Simpan Perubahan' : 'Terbitkan Berita'}</button>
+            </form>
+            ${listBox((appData.dispatches || []).map((d, i) => itemRow(d.photo, d.title, fmtDate(d.date), 'dispatch', i, 'deleteDispatch')).join(''))}
+        `)}
+    </div>`;
+}
+async function saveDispatch(e) {
+    e.preventDefault();
+    try {
+        const ed = adminEditing('dispatch');
+        const title = document.getElementById('dTitle').value.trim();
+        const date = document.getElementById('dDate').value || (ed ? ed.date : '');
+        const content = richGet('dContent');
+        if (!content) throw adminFail('Isi berita belum diisi.');
+        const photo = await adminPhoto('dPhoto', 'dispatch');
+        if (ed) { Object.assign(ed, { title, date, content }); if (photo) ed.photo = photo; }
+        else appData.dispatches.unshift({ id: Date.now(), title, date, content, photo: photo || null });
+        const wasEdit = !!ed; adminEdit = null;
+        await commitAdminChange(wasEdit ? 'Berita berhasil diperbarui!' : 'Berita resmi berhasil diterbitkan!');
+    } catch (err) { adminActionFailed(err); }
+}
+
+// ---------------- Official Promote Medpart ----------------
+const MEDPART_MAX_POSTERS = 3;
+function renderMedpartTab() {
+    const e = adminEditing('medpart');
+    return `<div class="space-y-6">
+        ${cardBox(`
+            ${formHead('medpart', 'Official Promote Medpart', e)}
+            <form id="form_medpart" onsubmit="saveMedpart(event)" class="space-y-3">
+                <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    <div><label class="${A_LBL}">Judul promosi</label><input type="text" id="mTitle" required value="${escHtml(e ? e.title : '')}" class="${A_INP}"></div>
+                    <div><label class="${A_LBL}">Nama medpart / mitra</label><input type="text" id="mPartner" value="${escHtml(e ? e.partner || '' : '')}" class="${A_INP}"></div>
+                    <div><label class="${A_LBL}">Tanggal</label><input type="date" id="mDate" ${e ? '' : 'required'} value="${e && /^\d{4}-\d{2}-\d{2}$/.test(e.date || '') ? e.date : ''}" class="${A_INP}"></div>
+                </div>
+                <div><label class="${A_LBL}">Deskripsi (opsional)</label>${richEditorHtml('mDesc', { initial: e ? e.desc : '', placeholder: 'Deskripsi promosi...', minH: 170 })}</div>
+                <div><label class="${A_LBL}">Poster (maks. ${MEDPART_MAX_POSTERS} gambar) ${e && (e.posters || []).length ? '— kosongkan jika tidak ingin mengganti' : ''}</label>
+                    <input type="file" accept="image/*" multiple id="mPosters" class="${A_FILE}">
+                    <p class="text-[11px] text-gray-400 mt-1">Poster otomatis diperkecil. ${e && (e.posters || []).length ? e.posters.map(p => '<img src="' + escHtml(p) + '" class="inline-block w-8 h-8 rounded object-cover align-middle mr-1">').join('') : ''}</p></div>
+                <div><label class="${A_LBL}">Link video YouTube (satu link per baris)</label>
+                    <textarea id="mVideos" rows="3" placeholder="https://youtube.com/watch?v=...&#10;https://youtu.be/..." class="${A_INP}">${escHtml(e ? (e.videos || []).join('\n') : '')}</textarea></div>
+                <button type="submit" class="${A_BTN}">${e ? 'Simpan Perubahan' : 'Tambahkan Promosi'}</button>
+            </form>
+            ${listBox((appData.medparts || []).map((m, i) => itemRow((m.posters || [])[0], m.title, (m.partner ? m.partner + ' · ' : '') + fmtDate(m.date), 'medpart', i, 'deleteMedpart')).join(''))}
+        `)}
+    </div>`;
+}
+async function saveMedpart(e) {
+    e.preventDefault();
+    try {
+        const ed = adminEditing('medpart');
+        const title = document.getElementById('mTitle').value.trim();
+        const partner = document.getElementById('mPartner').value.trim();
+        const date = document.getElementById('mDate').value || (ed ? ed.date : '');
+        const desc = richGet('mDesc');
+        const lines = document.getElementById('mVideos').value.split(/\r?\n/).map(x => x.trim()).filter(Boolean);
+        const bad = lines.find(l => !youtubeId(l));
+        if (bad) throw adminFail('Link YouTube tidak valid: ' + bad);
+        const videos = lines.map(l => 'https://www.youtube.com/watch?v=' + youtubeId(l));
+        const files = Array.from(document.getElementById('mPosters').files || []);
+        if (files.length > MEDPART_MAX_POSTERS) throw adminFail('Maksimal ' + MEDPART_MAX_POSTERS + ' poster.');
+        if (files.some(f => !f.type || !f.type.startsWith('image/'))) throw adminFail('Poster harus berupa gambar.');
+        const posters = files.length ? await uploadMediaFiles(files, 'medpart_' + Date.now(), 200000) : null;
+        if (!posters && !(ed && (ed.posters || []).length) && !videos.length) throw adminFail('Tambahkan minimal satu poster atau satu link video.');
+        if (ed) { Object.assign(ed, { title, partner, date, desc, videos }); if (posters) ed.posters = posters; }
+        else appData.medparts.unshift({ id: Date.now(), title, partner, date, desc, videos, posters: posters || [] });
+        const wasEdit = !!ed; adminEdit = null;
+        await commitAdminChange(wasEdit ? 'Promosi berhasil diperbarui!' : 'Promosi medpart berhasil ditambahkan!');
+    } catch (err) { adminActionFailed(err); }
+}
+
 
 /* ################ Semua halaman ################ */
 
@@ -2929,21 +3527,18 @@ function toggleMemberGroupName() {
                         <div class="text-center">
                             <span class="text-4xl">🔍</span>
                             <h2 class="font-serif text-3xl font-bold gold-text mt-2">Cek Hasil Seleksi</h2>
-                            <p class="text-gray-300 text-sm mt-1">Masukkan Nama, Tanggal Lahir, dan Divisi sesuai saat kamu mendaftar untuk melihat status seleksimu.</p>
+                            <p class="text-gray-300 text-sm mt-1">Tulis nama panjang atau nama panggilanmu dan divisi yang kamu daftar, lalu lihat status seleksimu.</p>
                         </div>
                         <div class="bg-forest-800/80 p-6 rounded-2xl gold-border shadow-xl">
                             <form onsubmit="checkSelectionResult(event)" class="space-y-4">
                                 <div>
-                                    <label class="block text-sm font-medium text-gold-400 mb-1">Nama</label>
-                                    <input type="text" id="cekName" required class="w-full px-4 py-3 rounded-xl bg-forest-900 border border-forest-600 focus:border-gold-500 text-white outline-none">
-                                </div>
-                                <div>
-                                   <label class="block text-sm font-medium text-gold-400 mb-1">Tanggal Lahir</label>
-                                   <input type="date" id="cekTanggalLahir" required class="w-full px-4 py-3 rounded-xl bg-forest-900 border border-forest-600 focus:border-gold-500 text-white outline-none">
+                                    <label class="block text-sm font-medium text-gold-400 mb-1">Nama Panjang atau Nama Panggilan</label>
+                                    <input type="text" id="cekName" required autocomplete="off" placeholder="cth: Ranny Carnita atau Ranny" class="w-full px-4 py-3 rounded-xl bg-forest-900 border border-forest-600 focus:border-gold-500 text-white outline-none">
                                 </div>
                                 <div>
                                     <label class="block text-sm font-medium text-gold-400 mb-1">Divisi</label>
-                                    <input type="text" id="cekDivisi" required placeholder="cth: Vocal, Dance, Manager, dst." class="w-full px-4 py-3 rounded-xl bg-forest-900 border border-forest-600 focus:border-gold-500 text-white outline-none">
+                                    <input type="text" id="cekDivisi" required list="cekDivisiList" autocomplete="off" placeholder="cth: Vocal, Dance, Manager, dst." class="w-full px-4 py-3 rounded-xl bg-forest-900 border border-forest-600 focus:border-gold-500 text-white outline-none">
+                                    <datalist id="cekDivisiList">${[...new Set((appData.forms || []).flatMap(f => (f.divisions || []).map(d => d.name)))].map(n => `<option value="${escHtml(n)}"></option>`).join('')}</datalist>
                                 </div>
                                 <button type="submit" class="w-full py-3 rounded-xl bg-gold-600 hover:bg-gold-500 text-black font-bold transition shadow-lg">Cek Status</button>
                             </form>
@@ -3333,11 +3928,11 @@ function toggleMemberGroupName() {
                                 <div class="bg-forest-800/80 p-6 rounded-2xl gold-border shadow-xl space-y-2">
                                     <div class="flex justify-between items-center text-xs text-gold-400 font-semibold">
                                         <span>📢 PENGUMUMAN</span>
-                                        <span>${ann.date}</span>
+                                        <span>${escHtml(fmtDate(ann.date))}</span>
                                     </div>
-                                    <h3 class="font-serif text-xl font-bold text-white">${ann.title}</h3>
-                                    <p class="text-sm text-gray-300 leading-relaxed">${ann.content}</p>
-                                    ${ann.photo ? `<img src="${ann.photo}" alt="${ann.title}" class="w-full max-h-96 object-cover rounded-xl mt-3 gold-border">` : ''}
+                                    <h3 class="font-serif text-xl font-bold text-white">${escHtml(ann.title)}</h3>
+                                    <div class="text-sm text-gray-300">${renderRich(ann.content)}</div>
+                                    ${ann.photo ? `<img src="${escHtml(ann.photo)}" alt="${escHtml(ann.title)}" class="w-full max-h-96 object-cover rounded-xl mt-3 gold-border">` : ''}
                                 </div>
                             `).join('')}
                         </div>
@@ -3370,10 +3965,10 @@ function toggleMemberGroupName() {
                             ` : appData.achievements.map(ach => `
                                 <div class="bg-forest-800/80 p-6 rounded-2xl gold-border shadow-xl flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                                     <div class="space-y-1 flex-1">
-                                        <span class="text-xs font-bold text-gold-400 bg-forest-900 px-3 py-1 rounded-full border border-forest-700">${ach.year}</span>
-                                        <h3 class="font-serif text-xl font-bold text-white mt-2">${ach.title}</h3>
-                                        <p class="text-sm text-gray-300">${ach.desc}</p>
-                                        ${ach.file ? (ach.fileType && ach.fileType.startsWith('image/') ? `<img src="${ach.file}" alt="${ach.title}" class="w-full max-w-sm max-h-72 object-cover rounded-xl mt-3 gold-border">` : `<a href="${ach.file}" download class="inline-block mt-2 text-xs text-gold-400 underline">📄 Unduh Bukti Penghargaan</a>`) : ''}
+                                        <span class="text-xs font-bold text-gold-400 bg-forest-900 px-3 py-1 rounded-full border border-forest-700">${escHtml(ach.year)}</span>
+                                        <h3 class="font-serif text-xl font-bold text-white mt-2">${escHtml(ach.title)}</h3>
+                                        <div class="text-sm text-gray-300">${renderRich(ach.desc)}</div>
+                                        ${ach.file ? (ach.fileType && ach.fileType.startsWith('image/') ? `<img src="${escHtml(ach.file)}" alt="${escHtml(ach.title)}" class="w-full max-w-sm max-h-72 object-cover rounded-xl mt-3 gold-border">` : `<a href="${ach.file}" download class="inline-block mt-2 text-xs text-gold-400 underline">📄 Unduh Bukti Penghargaan</a>`) : ''}
                                     </div>
                                     <span class="text-3xl">🏆</span>
                                 </div>
@@ -3384,6 +3979,140 @@ function toggleMemberGroupName() {
             }
             animatePageReveal();
         }
+
+
+// ======== Halaman: history ========
+// Halaman "History & Kerja Sama" (route: history): sejarah agensi, kerja sama/medpart, lengkap dengan foto, cerita latar belakang, dan beberapa isi.
+let historyFilter = 'Semua';
+function setHistoryFilter(f) { historyFilter = f; renderView(); }
+
+function renderView_history() {
+    const content = document.getElementById('appContent');
+    if (currentRoute !== 'toko') stopPromoBanner();
+    if (currentRoute === 'history') {
+        const cats = ['Semua', 'History', 'Kerja Sama', 'Medpart'];
+        const list = (appData.histories || []).filter(h => historyFilter === 'Semua' || h.category === historyFilter)
+            .slice().sort((a, b) => String(a.date).localeCompare(String(b.date)));
+        content.innerHTML = `
+            <div class="max-w-4xl mx-auto py-8 space-y-6">
+                <div class="text-center">
+                    <h2 class="font-serif text-3xl font-bold gold-text">History &amp; Kerja Sama</h2>
+                    <p class="text-gray-300 mt-1">Perjalanan Lorevia Entertainment, kolaborasi dengan agensi lain, dan kerja sama medpart.</p>
+                </div>
+                <div class="flex flex-wrap justify-center gap-2">
+                    ${cats.map(c => `<button onclick="setHistoryFilter('${c}')" class="chip ${historyFilter === c ? 'on' : ''}">${c}</button>`).join('')}
+                </div>
+                <div class="hist-line space-y-6">
+                    ${list.length === 0 ? `
+                        <div class="text-center py-14 bg-forest-800/40 rounded-2xl border border-forest-700">
+                            <p class="text-gray-400 text-sm">Belum ada data di kategori ini.</p>
+                        </div>
+                    ` : list.map((h, i) => `
+                        <article class="bg-forest-800/80 p-5 md:p-6 rounded-2xl gold-border shadow-xl space-y-3 relative" data-reveal="${i % 2 ? 'right' : 'left'}">
+                            <span class="hist-dot"></span>
+                            <div class="flex flex-wrap items-center justify-between gap-2 text-xs font-semibold">
+                                <span class="px-3 py-1 rounded-full bg-gold-600 text-black">${escHtml(h.category || 'History')}</span>
+                                <span class="text-gold-400">${escHtml(fmtDate(h.date))}</span>
+                            </div>
+                            <h3 class="font-serif text-xl md:text-2xl font-bold text-white">${escHtml(h.title)}</h3>
+                            ${h.partner ? `<p class="text-sm text-gold-400 font-semibold">Bersama: ${escHtml(h.partner)}</p>` : ''}
+                            ${h.photo ? `<img src="${escHtml(h.photo)}" alt="${escHtml(h.title)}" class="w-full max-h-96 object-cover rounded-xl gold-border">` : ''}
+                            ${h.story ? `<div><p class="text-[11px] font-bold tracking-widest uppercase text-gold-400 mb-1">Latar Belakang</p><div class="text-sm text-gray-200">${renderRich(h.story)}</div></div>` : ''}
+                            ${(h.contents || []).map(c => `
+                                <div class="bg-forest-900/60 rounded-xl p-4 border border-forest-700">
+                                    ${c.heading ? `<h4 class="font-serif font-bold text-gold-400 mb-1">${escHtml(c.heading)}</h4>` : ''}
+                                    <div class="text-sm text-gray-200">${renderRich(c.body)}</div>
+                                </div>
+                            `).join('')}
+                        </article>
+                    `).join('')}
+                </div>
+            </div>
+        `;
+    }
+    animatePageReveal();
+}
+
+
+// ======== Halaman: dispatch ========
+// Halaman "Dispatch Resmi" (route: dispatch): berita resmi dengan foto; link di dalam teks otomatis bisa diklik.
+function renderView_dispatch() {
+    const content = document.getElementById('appContent');
+    if (currentRoute !== 'toko') stopPromoBanner();
+    if (currentRoute === 'dispatch') {
+        const list = appData.dispatches || [];
+        content.innerHTML = `
+            <div class="max-w-3xl mx-auto py-8 space-y-6">
+                <div class="text-center mb-4">
+                    <h2 class="font-serif text-3xl font-bold gold-text">Dispatch Resmi</h2>
+                    <p class="text-gray-300 mt-1">Berita resmi dari Lorevia Entertainment.</p>
+                </div>
+                <div class="space-y-5">
+                    ${list.length === 0 ? `
+                        <div class="text-center py-14 bg-forest-800/40 rounded-2xl border border-forest-700">
+                            <p class="text-gray-400 text-sm">Belum ada berita resmi.</p>
+                        </div>
+                    ` : list.map(d => `
+                        <article class="bg-forest-800/80 rounded-2xl gold-border shadow-xl overflow-hidden">
+                            ${d.photo ? `<img src="${escHtml(d.photo)}" alt="${escHtml(d.title)}" class="w-full max-h-[26rem] object-cover">` : ''}
+                            <div class="p-5 md:p-6 space-y-2">
+                                <div class="flex justify-between items-center text-xs text-gold-400 font-semibold">
+                                    <span>📰 DISPATCH RESMI</span><span>${escHtml(fmtDate(d.date))}</span>
+                                </div>
+                                <h3 class="font-serif text-xl md:text-2xl font-bold text-white">${escHtml(d.title)}</h3>
+                                <div class="text-sm text-gray-200">${renderRich(d.content)}</div>
+                            </div>
+                        </article>
+                    `).join('')}
+                </div>
+            </div>
+        `;
+    }
+    animatePageReveal();
+}
+
+
+// ======== Halaman: medpart ========
+// Halaman "Official Promote Medpart" (route: medpart): poster + video YouTube untuk mempromosikan medpart.
+function renderView_medpart() {
+    const content = document.getElementById('appContent');
+    if (currentRoute !== 'toko') stopPromoBanner();
+    if (currentRoute === 'medpart') {
+        const list = appData.medparts || [];
+        content.innerHTML = `
+            <div class="max-w-5xl mx-auto py-8 space-y-6">
+                <div class="text-center mb-4">
+                    <h2 class="font-serif text-3xl font-bold gold-text">Official Promote Medpart</h2>
+                    <p class="text-gray-300 mt-1">Poster dan video resmi untuk mempromosikan kerja sama medpart Lorevia Entertainment.</p>
+                </div>
+                <div class="space-y-6">
+                    ${list.length === 0 ? `
+                        <div class="text-center py-14 bg-forest-800/40 rounded-2xl border border-forest-700">
+                            <p class="text-gray-400 text-sm">Belum ada promosi medpart.</p>
+                        </div>
+                    ` : list.map(m => `
+                        <article class="bg-forest-800/80 p-5 md:p-6 rounded-2xl gold-border shadow-xl space-y-4">
+                            <div class="flex flex-wrap justify-between items-center gap-2 text-xs text-gold-400 font-semibold">
+                                <span>${m.partner ? 'MEDPART · ' + escHtml(m.partner) : 'MEDPART'}</span><span>${escHtml(fmtDate(m.date))}</span>
+                            </div>
+                            <h3 class="font-serif text-xl md:text-2xl font-bold text-white">${escHtml(m.title)}</h3>
+                            ${m.desc ? `<div class="text-sm text-gray-200">${renderRich(m.desc)}</div>` : ''}
+                            ${(m.posters || []).length ? `
+                                <div class="grid grid-cols-1 ${m.posters.length > 1 ? 'sm:grid-cols-2' : ''} ${m.posters.length > 2 ? 'lg:grid-cols-3' : ''} gap-4">
+                                    ${m.posters.map((src, i) => `<img src="${escHtml(src)}" alt="Poster ${escHtml(m.title)} ${i + 1}" class="w-full rounded-xl gold-border object-cover" loading="lazy">`).join('')}
+                                </div>` : ''}
+                            ${(m.videos || []).length ? `
+                                <div class="grid grid-cols-1 ${m.videos.length > 1 ? 'md:grid-cols-2' : ''} gap-4">
+                                    ${m.videos.map(v => `<div class="space-y-1">${youtubeCardHtml(v)}</div>`).join('')}
+                                </div>` : ''}
+                        </article>
+                    `).join('')}
+                </div>
+            </div>
+        `;
+    }
+    animatePageReveal();
+}
 
 
 // ======== Halaman: struktur ========
@@ -3423,40 +4152,55 @@ function renderView_struktur() {
             .sort((x, y) => x - y)
             .map(lv => appData.adminStructure.filter(a => levelOf(a) === lv));
 
+        const roleLabel = nodes => [...new Set(nodes.map(n => n.role).filter(Boolean))].slice(0, 3).join(' & ');
         content.innerHTML = `
             <div class="max-w-6xl mx-auto py-8 space-y-8">
                 <div class="text-center">
                     <h2 class="font-serif text-3xl md:text-4xl font-bold gold-text">Struktur Admin</h2>
-                    <p class="text-gray-300 mt-2">Bagan kepengurusan inti Lorevia Entertainment, tersusun rapi dari level tertinggi hingga management.</p>
+                    <p class="text-gray-300 mt-2">Pohon kepengurusan Lorevia Entertainment: dari ranting teratas hingga akar yang menopang semuanya. Geser ke bawah untuk melihat tim muncul perlahan.</p>
                 </div>
                 ${appData.adminStructure.length === 0 ? `
                     <div class="text-center py-16 bg-forest-800/40 rounded-2xl border border-forest-700">
                         <p class="text-gray-400">Belum ada data struktur admin.</p>
                     </div>
                 ` : `
-                <div class="flex flex-col items-center">
-                    ${semuaLevel.map((nodes, levelIdx) => {
-                        return `
-                        <div class="flex flex-col items-center w-full">
-                            ${levelIdx > 0 ? '<div class="tree-stub h-8"></div>' : ''}
-                            <div class="tree-row flex flex-wrap justify-center gap-8 md:gap-10 pt-1 ${nodes.length > 1 ? 'border-t-2 border-gold-600/70 mt-1' : ''}">
-                                ${nodes.map(admin => `
-                                    <div class="flex flex-col items-center -mt-1">
-                                        ${nodes.length > 1 ? '<div class="tree-stub h-4"></div>' : ''}
+                <div class="org-tree" data-no-reveal>
+                    <div class="org-trunk"><div class="org-trunk-fill"></div></div>
+                    <div class="org-crown">
+                        <span class="text-5xl">🌿</span>
+                        <h3 class="font-serif text-2xl font-bold gold-text mt-1">Lorevia Entertainment</h3>
+                        <p class="text-xs text-gray-400 tracking-widest uppercase">Kepengurusan Inti</p>
+                    </div>
+                    ${semuaLevel.map((nodes, levelIdx) => `
+                        <div class="org-level">
+                            <span class="org-label">${escHtml(roleLabel(nodes) || ('Level ' + (levelIdx + 1)))}</span>
+                            <div class="org-branch"><span class="leaf l">🌿</span><span class="leaf r">🌿</span></div>
+                            <div class="org-nodes">
+                                ${nodes.map((admin, i) => `
+                                    <div class="org-node" style="--i:${i}">
                                         <div class="admin-card rounded-2xl border-2 border-gold-600/60 p-5 relative overflow-hidden flex flex-col items-center text-center group w-44 md:w-48 transition-shadow duration-300">
                                             <div class="admin-avatar-glow w-24 h-24 md:w-28 md:h-28 rounded-full border-2 border-gold-400 overflow-hidden mb-3 group-hover:scale-105 transition duration-300">
-                                                    <img src="${admin.img}" alt="${admin.name}" class="w-full h-full object-cover" onerror="this.onerror=null; this.classList.add('hidden'); this.nextElementSibling.classList.remove('hidden');">
-                                                    <div class="hidden w-full h-full items-center justify-center bg-forest-700 text-gold-400 text-3xl font-bold">${(admin.name || '?').charAt(0).toUpperCase()}</div>
+                                                <img src="${escHtml(admin.img || '')}" alt="${escHtml(admin.name)}" class="w-full h-full object-cover" onerror="this.onerror=null; this.classList.add('hidden'); this.nextElementSibling.classList.remove('hidden');">
+                                                <div class="hidden w-full h-full items-center justify-center bg-forest-700 text-gold-400 text-3xl font-bold">${escHtml((admin.name || '?').charAt(0).toUpperCase())}</div>
                                             </div>
-                                            <p class="text-[11px] font-bold text-gray-300 uppercase tracking-widest">${admin.role}</p>
-                                            <h3 class="font-serif text-lg font-bold gold-text leading-tight mt-0.5">${admin.name}</h3>
+                                            <p class="text-[11px] font-bold text-gray-300 uppercase tracking-widest">${escHtml(admin.role)}</p>
+                                            <h3 class="font-serif text-lg font-bold gold-text leading-tight mt-0.5">${escHtml(admin.name)}</h3>
                                         </div>
                                     </div>
                                 `).join('')}
                             </div>
                         </div>
-                        `;
-                    }).join('')}
+                    `).join('')}
+                    <div class="org-roots">
+                        <svg class="roots" viewBox="0 0 560 120" aria-hidden="true">
+                            <path pathLength="1" d="M280 0 C280 40 240 50 150 70 C110 80 70 90 40 118"/>
+                            <path pathLength="1" d="M280 0 C280 45 330 55 420 72 C460 82 500 92 530 118"/>
+                            <path pathLength="1" d="M280 0 C275 50 270 80 275 118"/>
+                            <path pathLength="1" d="M280 20 C250 55 200 70 190 110"/>
+                            <path pathLength="1" d="M280 20 C320 55 370 70 385 112"/>
+                        </svg>
+                        <p class="font-serif text-lg font-bold gold-text">Akar kami: kerja sama, kreativitas &amp; kekeluargaan</p>
+                    </div>
                 </div>
                 `}
             </div>
@@ -3942,6 +4686,9 @@ async function loadAudioPlaylistData() {
                     { key: 'management', label: '🛡️ management' },
                     { key: 'member', label: '🌱 Trainee / Member' },
                     { key: 'announce', label: '📢 Pengumuman & Penghargaan' },
+                    { key: 'history', label: '📜 History & Kerja Sama' },
+                    { key: 'dispatch', label: '📰 Dispatch Resmi' },
+                    { key: 'medpart', label: '🤝 Promote Medpart' },
                     { key: 'video', label: '🎬 Video Playlist' },
                     { key: 'audio', label: '🎧 Audio Playlist' },
                     { key: 'store', label: '🛍️ Toko & Pesanan' },
@@ -4323,62 +5070,10 @@ async function loadAudioPlaylistData() {
                         </div>
                         ` : ''}
 
-                        ${adminTab === 'announce' ? `
-                        <!-- ===== TAB: PENGUMUMAN & PENGHARGAAN ===== -->
-                        <div class="space-y-6">
-                            <div class="bg-forest-800/80 p-6 rounded-2xl gold-border shadow-xl space-y-4">
-                                <h4 class="font-serif text-lg font-bold text-gold-400">Pengumuman</h4>
-                                <form onsubmit="addAnnouncement(event)" class="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                                    <input type="text" id="annTitle" placeholder="Judul Pengumuman" required class="px-4 py-2.5 rounded-xl bg-forest-900 border border-forest-600 text-white text-sm outline-none">
-                                    <input type="text" id="annDate" placeholder="Tanggal (cth: 18 Mar 2026)" required class="px-4 py-2.5 rounded-xl bg-forest-900 border border-forest-600 text-white text-sm outline-none">
-                                    <input type="text" id="annContent" placeholder="Isi Pengumuman" required class="px-4 py-2.5 rounded-xl bg-forest-900 border border-forest-600 text-white text-sm outline-none">
-                                    <input type="file" accept="image/*" id="annPhoto" class="sm:col-span-3 px-4 py-2.5 rounded-xl bg-forest-900 border border-forest-600 text-white text-xs outline-none file:mr-2 file:py-1 file:px-2 file:rounded file:border-0 file:bg-gold-600 file:text-black file:text-xs file:font-bold"><p class="sm:col-span-3 text-[11px] text-gray-400">Foto otomatis diperkecil, maks. 600 KB per file.</p>
-                                    <button type="submit" class="sm:col-span-3 py-2.5 rounded-xl bg-gold-600 hover:bg-gold-500 text-black font-bold text-sm transition">Tambah Pengumuman</button>
-                                </form>
-                                <div class="space-y-2 max-h-72 overflow-y-auto pr-2">
-                                    ${appData.announcements.length === 0 ? '<p class="text-sm text-gray-400 text-center py-4">Belum ada pengumuman.</p>' : appData.announcements.map((ann, idx) => `
-                                        <div class="bg-forest-900/80 p-3 rounded-xl border border-forest-700 flex justify-between items-center gap-3 text-sm">
-                                            <div class="flex items-center gap-3">
-                                                ${ann.photo ? `<img src="${ann.photo}" class="w-10 h-10 rounded object-cover">` : ''}
-                                                <div>
-                                                    <p class="font-bold text-gold-400">${ann.title}</p>
-                                                    <p class="text-[10px] text-gray-400">${ann.date}</p>
-                                                </div>
-                                            </div>
-                                            <button onclick="deleteAnnouncement(${idx})" class="text-red-400 hover:text-red-300 text-xs">Hapus</button>
-                                        </div>
-                                    `).join('')}
-                                </div>
-                            </div>
-
-                            <div class="bg-forest-800/80 p-6 rounded-2xl gold-border shadow-xl space-y-4">
-                                <h4 class="font-serif text-lg font-bold text-gold-400">Penghargaan / Achievement</h4>
-                                <form onsubmit="addAchievement(event)" class="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                                    <input type="text" id="achTitle" placeholder="Judul Penghargaan" required class="px-4 py-2.5 rounded-xl bg-forest-900 border border-forest-600 text-white text-sm outline-none">
-                                    <input type="text" id="achYear" placeholder="Tahun (cth: 2026)" required class="px-4 py-2.5 rounded-xl bg-forest-900 border border-forest-600 text-white text-sm outline-none">
-                                    <input type="text" id="achDesc" placeholder="Deskripsi" required class="px-4 py-2.5 rounded-xl bg-forest-900 border border-forest-600 text-white text-sm outline-none">
-                                    <input type="file" accept="image/*,.pdf" id="achFile" class="sm:col-span-3 px-4 py-2.5 rounded-xl bg-forest-900 border border-forest-600 text-white text-xs outline-none file:mr-2 file:py-1 file:px-2 file:rounded file:border-0 file:bg-gold-600 file:text-black file:text-xs file:font-bold"><p class="sm:col-span-3 text-[11px] text-gray-400">Foto otomatis diperkecil, maks. 600 KB per file.</p>
-                                    <p class="sm:col-span-3 text-[11px] text-gray-400 -mt-1">Unggah foto sertifikat/piala atau file bukti penghargaan (gambar/PDF).</p>
-                                    <button type="submit" class="sm:col-span-3 py-2.5 rounded-xl bg-gold-600 hover:bg-gold-500 text-black font-bold text-sm transition">Tambah Penghargaan</button>
-                                </form>
-                                <div class="space-y-2 max-h-72 overflow-y-auto pr-2">
-                                    ${appData.achievements.length === 0 ? '<p class="text-sm text-gray-400 text-center py-4">Belum ada penghargaan.</p>' : appData.achievements.map((ach, idx) => `
-                                        <div class="bg-forest-900/80 p-3 rounded-xl border border-forest-700 flex justify-between items-center gap-3 text-sm">
-                                            <div class="flex items-center gap-3">
-                                                ${ach.file ? (ach.fileType && ach.fileType.startsWith('image/') ? `<img src="${ach.file}" class="w-10 h-10 rounded object-cover">` : `<span class="text-xl">📄</span>`) : ''}
-                                                <div>
-                                                    <p class="font-bold text-gold-400">${ach.title} <span class="text-[10px] text-gray-400">(${ach.year})</span></p>
-                                                    <p class="text-xs text-gray-300">${ach.desc}</p>
-                                                    ${ach.file && ach.fileType && !ach.fileType.startsWith('image/') ? `<a href="${ach.file}" download class="text-[10px] text-gold-400 underline">Unduh File</a>` : ''}
-                                                </div>
-                                            </div>
-                                            <button onclick="deleteAchievement(${idx})" class="text-red-400 hover:text-red-300 text-xs">Hapus</button>
-                                        </div>
-                                    `).join('')}
-                                </div>
-                            </div>
-                        </div>
-                        ` : ''}
+                        ${adminTab === 'announce' ? renderAnnounceTab() : ''}
+                        ${adminTab === 'history' ? renderHistoryTab() : ''}
+                        ${adminTab === 'dispatch' ? renderDispatchTab() : ''}
+                        ${adminTab === 'medpart' ? renderMedpartTab() : ''}
 
                         ${adminTab === 'video' ? `
                         <!-- ===== TAB: VIDEO PLAYLIST ===== -->
@@ -4514,6 +5209,9 @@ const PAGE_RENDERERS = {
     'checkout': renderView_checkout,
     'pengumuman': renderView_pengumuman,
     'achievement': renderView_achievement,
+    'history': renderView_history,
+    'dispatch': renderView_dispatch,
+    'medpart': renderView_medpart,
     'struktur': renderView_struktur,
     'guestbox': renderView_guestbox,
     'video-playlist': renderView_video_playlist,

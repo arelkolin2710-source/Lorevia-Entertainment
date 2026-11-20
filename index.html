@@ -111,6 +111,10 @@
 <symbol id="trophy" viewBox="0 0 24 24"><path d="M18 2c-.9 0-2 1-2 2H8c0-1-1.1-2-2-2H2v9c0 1 1 2 2 2h2.2c.4 2 1.7 3.7 4.8 4v2.08C8 19.54 8 22 8 22h8s0-2.46-3-2.92V17c3.1-.3 4.4-2 4.8-4H20c1 0 2-1 2-2V2zM6 11H4V4h2zm14 0h-2V4h2z"/></symbol>
 <symbol id="volume-high" viewBox="0 0 24 24"><path d="M14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.84-5 6.7v2.07c4-.91 7-4.49 7-8.77s-3-7.86-7-8.77M16.5 12c0-1.77-1-3.29-2.5-4.03V16c1.5-.71 2.5-2.24 2.5-4M3 9v6h4l5 5V4L7 9z"/></symbol>
 <symbol id="volume-off" viewBox="0 0 24 24"><path d="M12 4 9.91 6.09 12 8.18M4.27 3 3 4.27 7.73 9H3v6h4l5 5v-6.73l4.25 4.26c-.67.51-1.42.93-2.25 1.17v2.07c1.38-.32 2.63-.95 3.68-1.81L19.73 21 21 19.73l-9-9M19 12c0 .94-.2 1.82-.54 2.64l1.51 1.51A8.9 8.9 0 0 0 21 12c0-4.28-3-7.86-7-8.77v2.06c2.89.86 5 3.54 5 6.71m-2.5 0c0-1.77-1-3.29-2.5-4.03v2.21l2.45 2.45c.05-.2.05-.42.05-.63"/></symbol>
+<symbol id="history" viewBox="0 0 24 24"><path d="M13 3a9 9 0 0 0-9 9H1l3.89 3.89.07.14L9 12H6c0-3.87 3.13-7 7-7s7 3.13 7 7-3.13 7-7 7c-1.93 0-3.68-.79-4.94-2.06l-1.42 1.42A8.954 8.954 0 0 0 13 21a9 9 0 0 0 0-18m-1 5v5l4.28 2.54.72-1.21-3.5-2.08V8z"/></symbol>
+<symbol id="article" viewBox="0 0 24 24"><path d="M19 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V5a2 2 0 0 0-2-2m-5 14H7v-2h7zm3-4H7v-2h10zm0-4H7V7h10z"/></symbol>
+<symbol id="people" viewBox="0 0 24 24"><path d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5s-3 1.34-3 3 1.34 3 3 3m-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5 5 6.34 5 8s1.34 3 3 3m0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5m8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5"/></symbol>
+<symbol id="play-circle" viewBox="0 0 24 24"><path d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20m-2 14.5v-9l6 4.5z"/></symbol>
 </svg>
 
 
@@ -187,6 +191,15 @@
             </button>
             <button data-route="achievement" onclick="navigate('achievement'); toggleSidebar();" class="nav-pill">
                 <span class="nav-emoji"><svg class="ico" aria-hidden="true"><use href="#trophy"></use></svg></span><span>Achievement</span>
+            </button>
+            <button data-route="history" onclick="navigate('history'); toggleSidebar();" class="nav-pill">
+                <span class="nav-emoji"><svg class="ico" aria-hidden="true"><use href="#history"></use></svg></span><span>History & Kerja Sama</span>
+            </button>
+            <button data-route="dispatch" onclick="navigate('dispatch'); toggleSidebar();" class="nav-pill">
+                <span class="nav-emoji"><svg class="ico" aria-hidden="true"><use href="#article"></use></svg></span><span>Dispatch Resmi</span>
+            </button>
+            <button data-route="medpart" onclick="navigate('medpart'); toggleSidebar();" class="nav-pill">
+                <span class="nav-emoji"><svg class="ico" aria-hidden="true"><use href="#people"></use></svg></span><span>Official Promote Medpart</span>
             </button>
             <button data-route="struktur" onclick="navigate('struktur'); toggleSidebar();" class="nav-pill">
                 <span class="nav-emoji"><svg class="ico" aria-hidden="true"><use href="#butterfly"></use></svg></span><span>Struktur Admin</span>
