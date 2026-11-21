@@ -2,7 +2,7 @@
 /* ################ Rute awal ################ */
 // Rute aktif ditentukan dari alamat: /?p=toko  atau  /#loreviaadmin (dasbor admin, tanpa sandi)
 (function () {
-    var ROUTES = ["beranda", "gen-members", "pendaftaran-trainee", "pendaftaran-management", "cek-hasil", "about", "member", "toko", "checkout", "pengumuman", "achievement", "history", "dispatch", "medpart", "struktur", "guestbox", "video-playlist", "audio-playlist", "admin-dashboard"];
+    var ROUTES = ["beranda", "gen-members", "pendaftaran-trainee", "pendaftaran-management", "cek-hasil", "about", "member", "toko", "checkout", "pengumuman", "achievement", "history", "kerjasama", "dispatch", "medpart", "struktur", "guestbox", "video-playlist", "audio-playlist", "admin-dashboard"];
     var p = new URLSearchParams(location.search).get('p');
     window.PAGE_ROUTE = location.hash === '#loreviaadmin' ? 'admin-dashboard' : (ROUTES.indexOf(p) >= 0 ? p : 'beranda');
 })();
@@ -283,16 +283,21 @@
             if (!appData.videos) appData.videos = [];
             if (!appData.audios) appData.audios = [];
             if (!appData.promos) appData.promos = [];
+            let likedSet = {};
+            try { likedSet = JSON.parse(localStorage.getItem('lorevia_liked') || '{}') || {}; } catch (e) { likedSet = {}; }
             appData.audios.forEach(a => {
                 if (typeof a.plays !== 'number') a.plays = 0;
                 if (typeof a.likes !== 'number') a.likes = 0;
-                if (!Array.isArray(a.comments)) a.comments = [];
+                if (typeof a.commentCount !== 'number') a.commentCount = 0;
+                a._liked = !!likedSet[a.id];
             });
             appData.videos.forEach(v => {
                 if (typeof v.views !== 'number') v.views = 0;
                 if (typeof v.likes !== 'number') v.likes = 0;
-                if (!Array.isArray(v.comments)) v.comments = [];
+                if (typeof v.commentCount !== 'number') v.commentCount = 0;
+                v._liked = !!likedSet[v.id];
             });
+            if (!appData.cooperations) appData.cooperations = [];
             if (!appData.products) appData.products = [];
             if (!appData.orders) appData.orders = [];
             if (!appData.registrationOpen) appData.registrationOpen = { trainee: true, management: true };
@@ -337,7 +342,7 @@
         'announcements', 'achievements', 'adminStructure', 'members', 'managementList',
         'traineeSubmissions', 'managementSubmissions', 'guestBoxes', 'products', 'orders',
         'promos', 'videoPlaylists', 'audioPlaylists', 'videos', 'audios', 'forms', 'slotUsage',
-        'histories', 'dispatches', 'medparts'
+        'histories', 'cooperations', 'dispatches', 'medparts'
     ];
     // Pengaturan umum, disimpan di satu dokumen settings/main.
     const SETTING_KEYS = ['genLabel', 'registrationOpen', 'resultsAnnounceDate'];
@@ -377,7 +382,16 @@
     }
     window.loreviaStrip = v => strip(v, 100000);   // untuk cache localStorage (kuota kecil)
 
-    function prepare(item) {
+    // Penghitung (suka, putar, tonton, jumlah komentar) diubah langsung di Firestore dengan increment(),
+    // jadi TIDAK ikut disimpan saat admin mengedit item (supaya tidak menimpa angka dari pengunjung lain).
+    const COUNTERS = ['likes', 'plays', 'views', 'commentCount', 'comments', '_liked', '_counted'];
+    const COUNTER_KEYS = { videos: 1, audios: 1 };
+
+    function prepare(item, key) {
+        if (key && COUNTER_KEYS[key]) {
+            item = Object.assign({}, item);
+            COUNTERS.forEach(c => { delete item[c]; });
+        }
         let d = strip(item, MAX_DATA_URI);
         if (JSON.stringify(d).length > 900000) d = strip(item, 100000);
         return d;
@@ -403,7 +417,7 @@
         arr.forEach((item, i) => {
             if (!item || typeof item !== 'object') return;
             const id = ensureId(item);
-            const data = prepare(item);
+            const data = prepare(item, key);
             delete data._order;
             if (isLoaded) {
                 data._order = i;
@@ -434,7 +448,7 @@
                 cur.forEach((v, id) => {
                     const old = base.get(id);
                     if (old !== v.json) {
-                        ops.push({ kind: 'set', ref: fs.doc(db, key, id), data: v.data,
+                        ops.push({ kind: 'set', ref: fs.doc(db, key, id), data: v.data, merge: !!COUNTER_KEYS[key],
                                    done: () => base.set(id, v.json) });
                     }
                 });
@@ -455,7 +469,7 @@
             for (let i = 0; i < ops.length; i += 400) {
                 const part = ops.slice(i, i + 400);
                 const batch = fs.writeBatch(db);
-                part.forEach(op => op.kind === 'set' ? batch.set(op.ref, op.data) : batch.delete(op.ref));
+                part.forEach(op => op.kind === 'set' ? (op.merge ? batch.set(op.ref, op.data, { merge: true }) : batch.set(op.ref, op.data)) : batch.delete(op.ref));
                 await batch.commit();
                 part.forEach(op => op.done());
             }
@@ -640,6 +654,36 @@
                     await batch.commit();
                 }
             } catch (e) { console.warn('[Lorevia DB] gagal menghapus potongan media:', e); }
+        }
+    };
+
+
+    // ---------- Suka / putar / komentar (atomik, aman dipakai banyak pengunjung bersamaan) ----------
+    window.loreviaBump = async function (coll, id, field, delta) {
+        try {
+            await window.loreviaMedia.ready();
+            await fs.updateDoc(fs.doc(db, coll, String(id).replace(/\//g, '_')), { [field]: fs.increment(delta) });
+            return true;
+        } catch (e) { console.error('[Lorevia DB] gagal memperbarui', field, e); return false; }
+    };
+    window.loreviaComments = {
+        async list(itemId) {
+            await window.loreviaMedia.ready();
+            const snap = await fs.getDocs(fs.query(fs.collection(db, 'comments'), fs.where('itemId', '==', String(itemId))));
+            const rows = [];
+            snap.forEach(d => { const x = d.data(); x._id = d.id; rows.push(x); });
+            rows.sort((a, b) => (b.ts || 0) - (a.ts || 0));
+            return rows;
+        },
+        async add(c) {
+            await window.loreviaMedia.ready();
+            const id = Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+            await fs.setDoc(fs.doc(db, 'comments', id), c);
+            return id;
+        },
+        async del(id) {
+            await window.loreviaMedia.ready();
+            await fs.deleteDoc(fs.doc(db, 'comments', id));
         }
     };
 
@@ -834,7 +878,7 @@ async function kirimKeSheet(type, data) {
 
         window.addEventListener('beforeunload', persistState);
 
-        const ROUTE_TITLES = {"beranda": "Lorevia Entertainment 🌿 | Agensi Terbaik di RVN Sepanjang Masa", "gen-members": "Member Generasi - Lorevia Entertainment", "pendaftaran-trainee": "Pendaftaran Trainee - Lorevia Entertainment", "pendaftaran-management": "Pendaftaran management - Lorevia Entertainment", "cek-hasil": "Cek Hasil Seleksi - Lorevia Entertainment", "about": "About - Lorevia Entertainment", "member": "Member - Lorevia Entertainment", "toko": "Toko - Lorevia Entertainment", "checkout": "Checkout - Lorevia Entertainment", "pengumuman": "Pengumuman - Lorevia Entertainment", "achievement": "Achievement - Lorevia Entertainment", "struktur": "Struktur Admin - Lorevia Entertainment", "guestbox": "Guest Box - Lorevia Entertainment", "history": "History Lorevia - Lorevia Entertainment", "dispatch": "Dispatch Resmi - Lorevia Entertainment", "medpart": "Official Promote Medpart - Lorevia Entertainment", "video-playlist": "Video Playlist - Lorevia Entertainment", "audio-playlist": "Audio Playlist - Lorevia Entertainment", "admin-dashboard": "Dasbor Admin - Lorevia Entertainment"};
+        const ROUTE_TITLES = {"beranda": "Lorevia Entertainment RVN 🌿", "gen-members": "Lorevia Entertainment RVN 🌿", "pendaftaran-trainee": "Lorevia Entertainment RVN 🌿", "pendaftaran-management": "Lorevia Entertainment RVN 🌿", "cek-hasil": "Lorevia Entertainment RVN 🌿", "about": "Lorevia Entertainment RVN 🌿", "member": "Lorevia Entertainment RVN 🌿", "toko": "Lorevia Entertainment RVN 🌿", "checkout": "Lorevia Entertainment RVN 🌿", "pengumuman": "Lorevia Entertainment RVN 🌿", "achievement": "Lorevia Entertainment RVN 🌿", "history": "Lorevia Entertainment RVN 🌿", "kerjasama": "Lorevia Entertainment RVN 🌿", "dispatch": "Lorevia Entertainment RVN 🌿", "medpart": "Lorevia Entertainment RVN 🌿", "struktur": "Lorevia Entertainment RVN 🌿", "guestbox": "Lorevia Entertainment RVN 🌿", "video-playlist": "Lorevia Entertainment RVN 🌿", "audio-playlist": "Lorevia Entertainment RVN 🌿", "admin-dashboard": "Lorevia Entertainment RVN 🌿"};
 
         let currentRoute = window.PAGE_ROUTE || 'beranda';
         // Akses admin: buka  situs.com/#loreviaadmin  (tanpa sandi). Status disimpan di sessionStorage
@@ -1579,22 +1623,6 @@ async function kirimKeSheet(type, data) {
             renderView();
         }
 
-        async function updateAudio(idx) {
-            const title = document.getElementById(`audTitleEdit_${idx}`).value;
-            const date = document.getElementById(`audDateEdit_${idx}`).value;
-            const playlistId = document.getElementById(`audPlaylistEdit_${idx}`).value || null;
-            const thumbFile = document.getElementById(`audThumbEdit_${idx}`).files[0];
-            let cover = appData.audios[idx].cover || '';
-            if (thumbFile) {
-                const urls = await uploadMediaFiles([thumbFile], 'audio_cover_' + Date.now());
-                cover = urls[0] || cover;
-            }
-            appData.audios[idx] = { ...appData.audios[idx], title, date, playlistId, cover };
-            saveAppData();
-            alert('Audio berhasil diperbarui!');
-            renderView();
-        }
-
         // ===== TikTok-style Video Feed =====
         let ttFeedList = [];
         let ttObserver = null;
@@ -1619,7 +1647,7 @@ async function kirimKeSheet(type, data) {
                         </button>
                         <button type="button" onclick="event.stopPropagation(); openComments('video', ${idx})" class="flex flex-col items-center gap-1">
                             <span class="text-2xl drop-shadow">💬</span>
-                            <span class="text-[11px] font-semibold drop-shadow">${(v.comments && v.comments.length) || 0}</span>
+                            <span class="text-[11px] font-semibold drop-shadow">${v.commentCount || 0}</span>
                         </button>
                         <div class="flex flex-col items-center gap-1">
                             <span class="text-2xl drop-shadow">👁️</span>
@@ -1668,7 +1696,7 @@ async function kirimKeSheet(type, data) {
             if (!v || v._counted) return;
             v.views = (v.views || 0) + 1;
             v._counted = true;
-            saveAppData();
+            window.loreviaBump('videos', v.id, 'views', 1);
             const label = document.getElementById(`ttViews_${idx}`);
             if (label) label.textContent = v.views.toLocaleString('id-ID');
             const gridLabel = document.getElementById(`videoViews_${idx}`);
@@ -1742,7 +1770,7 @@ async function kirimKeSheet(type, data) {
                 if (!a._counted) {
                     a.plays = (a.plays || 0) + 1;
                     a._counted = true;
-                    saveAppData();
+                    window.loreviaBump('audios', a.id, 'plays', 1);
                     const label = document.getElementById(`audioPlays_${idx}`);
                     if (label) label.textContent = a.plays.toLocaleString('id-ID');
                 }
@@ -1762,85 +1790,6 @@ async function kirimKeSheet(type, data) {
         // ===== LIKE & KOMENTAR (video & audio) =====
         function getPlaylistItem(type, idx) {
             return type === 'video' ? appData.videos[idx] : appData.audios[idx];
-        }
-
-        function toggleLike(type, idx) {
-            const item = getPlaylistItem(type, idx);
-            if (!item) return;
-            if (item._liked) {
-                item.likes = Math.max(0, (item.likes || 0) - 1);
-                item._liked = false;
-            } else {
-                item.likes = (item.likes || 0) + 1;
-                item._liked = true;
-            }
-            saveAppData();
-            const icon = document.getElementById(`${type}LikeIcon_${idx}`);
-            const count = document.getElementById(`${type}LikeCount_${idx}`);
-            const btn = document.getElementById(`${type}LikeBtn_${idx}`);
-            if (icon) icon.textContent = item._liked ? '❤️' : '🤍';
-            if (count) count.textContent = item.likes.toLocaleString('id-ID');
-            if (btn) {
-                btn.classList.toggle('text-red-400', item._liked);
-                btn.classList.toggle('text-gray-400', !item._liked);
-            }
-        }
-
-        let commentTarget = null;
-
-        function openComments(type, idx) {
-            const item = getPlaylistItem(type, idx);
-            if (!item) return;
-            commentTarget = { type, idx };
-            document.getElementById('commentsModalTitle').textContent = `💬 Komentar — ${item.title}`;
-            document.getElementById('commentName').value = '';
-            document.getElementById('commentText').value = '';
-            renderCommentsList();
-            const modal = document.getElementById('commentsModal');
-            modal.classList.remove('hidden');
-            modal.classList.add('flex');
-        }
-
-        function closeComments() {
-            commentTarget = null;
-            const modal = document.getElementById('commentsModal');
-            modal.classList.add('hidden');
-            modal.classList.remove('flex');
-        }
-
-        function renderCommentsList() {
-            if (!commentTarget) return;
-            const item = getPlaylistItem(commentTarget.type, commentTarget.idx);
-            const list = document.getElementById('commentsList');
-            if (!item || !list) return;
-            const comments = item.comments || [];
-            list.innerHTML = comments.length === 0
-                ? '<p class="text-sm text-gray-400 text-center py-8">Belum ada komentar. Jadilah yang pertama berkomentar!</p>'
-                : comments.slice().reverse().map(c => `
-                    <div class="bg-forest-900/70 rounded-xl p-3 border border-forest-700">
-                        <div class="flex items-center justify-between gap-2">
-                            <p class="text-sm font-semibold text-gold-400 truncate">${c.name}</p>
-                            <p class="text-[10px] text-gray-500 flex-shrink-0">${c.date}</p>
-                        </div>
-                        <p class="text-sm text-gray-200 mt-1 break-words">${c.text}</p>
-                    </div>
-                `).join('');
-        }
-
-        function submitComment(e) {
-            e.preventDefault();
-            if (!commentTarget) return;
-            const item = getPlaylistItem(commentTarget.type, commentTarget.idx);
-            if (!item) return;
-            const name = document.getElementById('commentName').value.trim();
-            const text = document.getElementById('commentText').value.trim();
-            if (!name || !text) return;
-            if (!item.comments) item.comments = [];
-            item.comments.push({ name, text, date: new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' }) });
-            saveAppData();
-            document.getElementById('commentText').value = '';
-            renderCommentsList();
-            renderView();
         }
 
         // ===== FORMULIR PENDAFTARAN DINAMIS =====
@@ -2945,7 +2894,7 @@ function toggleMemberGroupName() {
 // Semua isi tulisan memakai editor teks kaya (tebal, miring, dll) dengan pratinjau; foto otomatis diperkecil (maks. 600 KB).
 
 let adminEdit = null;   // { type, idx } saat sedang mengedit item yang sudah ada
-const ADMIN_LISTS = { announce: 'announcements', achieve: 'achievements', history: 'histories', dispatch: 'dispatches', medpart: 'medparts' };
+const ADMIN_LISTS = { announce: 'announcements', achieve: 'achievements', history: 'histories', coop: 'cooperations', dispatch: 'dispatches', medpart: 'medparts' };
 const A_INP = 'w-full px-4 py-2.5 rounded-xl bg-forest-900 border border-forest-600 text-white text-sm outline-none';
 const A_FILE = 'w-full px-4 py-2.5 rounded-xl bg-forest-900 border border-forest-600 text-white text-xs outline-none file:mr-2 file:py-1 file:px-2 file:rounded file:border-0 file:bg-gold-600 file:text-black file:text-xs file:font-bold';
 const A_BTN = 'w-full py-2.5 rounded-xl bg-gold-600 hover:bg-gold-500 text-black font-bold text-sm transition';
@@ -2973,6 +2922,7 @@ function adminDelete(type, idx, label) {
 const deleteAnnouncement = i => adminDelete('announce', i, 'pengumuman');
 const deleteAchievement = i => adminDelete('achieve', i, 'penghargaan');
 const deleteHistory = i => adminDelete('history', i, 'data history');
+const deleteCoop = i => adminDelete('coop', i, 'data kerja sama');
 const deleteDispatch = i => adminDelete('dispatch', i, 'berita');
 const deleteMedpart = i => adminDelete('medpart', i, 'promosi medpart');
 
@@ -3234,6 +3184,63 @@ async function saveMedpart(e) {
     } catch (err) { adminActionFailed(err); }
 }
 
+// ---------------- Kerja Sama (cooperation) dengan agensi / mitra lain ----------------
+function coopAddBlock() {
+    const box = document.getElementById('coopBlocks');
+    if (!box) return;
+    if (box.querySelectorAll('.hist-block').length >= 12) { alert('Maksimal 12 bagian isi.'); return; }
+    box.insertAdjacentHTML('beforeend', histBlockHtml('', ''));
+    const last = box.lastElementChild.querySelector('.re-area');
+    if (last) richUpdate(last.id);
+}
+function renderCoopTab() {
+    const e = adminEditing('coop');
+    const blocks = e ? (e.contents || []) : [];
+    return `<div class="space-y-6">
+        ${cardBox(`
+            ${formHead('coop', 'Kerja Sama (Cooperation)', e)}
+            <p class="text-[11px] text-gray-400 -mt-2">Khusus kerja sama dengan agensi/pihak lain. Sejarah Lorevia sendiri ada di tab History Lorevia.</p>
+            <form id="form_coop" onsubmit="saveCoop(event)" class="space-y-3">
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div><label class="${A_LBL}">Judul kerja sama</label><input type="text" id="cpTitle" required value="${escHtml(e ? e.title : '')}" class="${A_INP}"></div>
+                    <div><label class="${A_LBL}">Nama agensi / mitra</label><input type="text" id="cpPartner" required value="${escHtml(e ? e.partner || '' : '')}" class="${A_INP}"></div>
+                    <div><label class="${A_LBL}">Tanggal</label><input type="date" id="cpDate" ${e ? '' : 'required'} value="${e && /^\d{4}-\d{2}-\d{2}$/.test(e.date || '') ? e.date : ''}" class="${A_INP}"></div>
+                </div>
+                ${photoField('cpPhoto', e && e.photo)}
+                <div><label class="${A_LBL}">Cerita latar belakang agensi / mitra</label>${richEditorHtml('cpStory', { initial: e ? e.story : '', placeholder: 'Ceritakan siapa mitranya dan latar belakang kerja samanya...', minH: 220 })}</div>
+                <div class="space-y-2">
+                    <div class="flex justify-between items-center"><label class="${A_LBL} mb-0">Isi tambahan (bisa lebih dari satu)</label>
+                        <button type="button" onclick="coopAddBlock()" class="px-3 py-1 rounded-lg bg-forest-700 text-gold-400 text-xs font-bold hover:bg-gold-600 hover:text-black">+ Tambah bagian isi</button></div>
+                    <div id="coopBlocks" class="space-y-3">${blocks.map(b => histBlockHtml(b.heading, b.body)).join('')}</div>
+                </div>
+                <button type="submit" class="${A_BTN}">${e ? 'Simpan Perubahan' : 'Tambahkan'}</button>
+            </form>
+            ${listBox((appData.cooperations || []).map((h, i) => itemRow(h.photo, h.title, (h.partner ? h.partner + ' · ' : '') + fmtDate(h.date), 'coop', i, 'deleteCoop')).join(''))}
+        `)}
+    </div>`;
+}
+async function saveCoop(e) {
+    e.preventDefault();
+    try {
+        const ed = adminEditing('coop');
+        const title = document.getElementById('cpTitle').value.trim();
+        const partner = document.getElementById('cpPartner').value.trim();
+        const date = document.getElementById('cpDate').value || (ed ? ed.date : '');
+        const story = richGet('cpStory');
+        const contents = Array.from(document.querySelectorAll('#coopBlocks .hist-block')).map(b => ({
+            heading: b.querySelector('.hc-heading').value.trim(),
+            body: richGet(b.querySelector('.re-area').id)
+        })).filter(c => c.heading || c.body);
+        if (!story && !contents.length) throw adminFail('Isi cerita latar belakang atau minimal satu bagian isi.');
+        const photo = await adminPhoto('cpPhoto', 'coop');
+        const data = { title, partner, date, story, contents };
+        if (ed) { Object.assign(ed, data); if (photo) ed.photo = photo; }
+        else appData.cooperations.unshift({ id: Date.now(), ...data, photo: photo || null });
+        const wasEdit = !!ed; adminEdit = null;
+        await commitAdminChange(wasEdit ? 'Data kerja sama diperbarui!' : 'Kerja sama berhasil ditambahkan!');
+    } catch (err) { adminActionFailed(err); }
+}
+
 
 /* ################ Media video/audio ################ */
 // Video & audio playlist: file diunggah dan disimpan langsung di database Firestore (tanpa Google Drive / Apps Script).
@@ -3384,6 +3391,8 @@ function deleteVideo(idx) {
 async function addAudio(e) {
     e.preventDefault();
     const title = document.getElementById('audTitle').value.trim();
+    const artist = document.getElementById('audArtist').value.trim();
+    const kind = document.getElementById('audKind').value === 'cover' ? 'cover' : 'original';
     const date = document.getElementById('audDate').value.trim();
     const playlistId = document.getElementById('audPlaylist').value || null;
     const file = document.getElementById('audFile').files[0];
@@ -3397,7 +3406,7 @@ async function addAudio(e) {
         const up = await uploadMediaFile(file, 'audio', setStatus);
         setStatus('Menyimpan...');
         const cover = thumbFile ? (await uploadMediaFiles([thumbFile], 'audio_cover_' + Date.now(), 150000))[0] : '';
-        appData.audios.unshift({ id: up.mid, title, date, playlistId, data: 'fs:' + up.mid, chunks: up.chunks,
+        appData.audios.unshift({ id: up.mid, title, artist, kind, date, playlistId, data: 'fs:' + up.mid, chunks: up.chunks,
             fileType: file.type || 'audio/mpeg', cover: cover || '', plays: 0, likes: 0, comments: [] });
         saveAppData();
         const ok = await window.loreviaDbFlush();
@@ -3455,6 +3464,162 @@ async function ttStartVideo(video, slideIdx) {
         if (btn) btn.textContent = '🔇';
         video.play().catch(() => {});
     });
+}
+
+// =====================================================================
+// SUKA & KOMENTAR (tersimpan di database, aman untuk banyak pengunjung)
+// =====================================================================
+function getLikedSet() { try { return JSON.parse(localStorage.getItem('lorevia_liked') || '{}') || {}; } catch (e) { return {}; } }
+function setLikedLocal(id, on) {
+    const s = getLikedSet();
+    if (on) s[id] = 1; else delete s[id];
+    try { localStorage.setItem('lorevia_liked', JSON.stringify(s)); } catch (e) {}
+}
+
+async function toggleLike(type, idx) {
+    const item = getPlaylistItem(type, idx);
+    if (!item || item._busy) return;
+    const coll = type === 'video' ? 'videos' : 'audios';
+    const liked = !item._liked;
+    const before = { liked: item._liked, likes: item.likes || 0 };
+    item._busy = true;
+    item._liked = liked;
+    item.likes = Math.max(0, before.likes + (liked ? 1 : -1));
+    paintLike(type, idx, item);
+    const ok = await window.loreviaBump(coll, item.id, 'likes', liked ? 1 : -1);
+    item._busy = false;
+    if (!ok) {   // gagal ke database: kembalikan tampilan
+        item._liked = before.liked; item.likes = before.likes;
+        paintLike(type, idx, item);
+        alert('Suka belum tersimpan karena database belum terhubung. Coba muat ulang halaman.');
+        return;
+    }
+    setLikedLocal(item.id, liked);
+}
+function paintLike(type, idx, item) {
+    const icon = document.getElementById(`${type}LikeIcon_${idx}`);
+    const count = document.getElementById(`${type}LikeCount_${idx}`);
+    const btn = document.getElementById(`${type}LikeBtn_${idx}`);
+    if (icon) icon.textContent = item._liked ? '❤️' : '🤍';
+    if (count) count.textContent = (item.likes || 0).toLocaleString('id-ID');
+    if (btn) { btn.classList.toggle('text-red-400', !!item._liked); btn.classList.toggle('text-gray-400', !item._liked); }
+    const tIcon = document.getElementById(`ttLikeIcon_${idx}`), tCount = document.getElementById(`ttLikeCount_${idx}`);
+    if (type === 'video') {
+        if (tIcon) tIcon.textContent = item._liked ? '❤️' : '🤍';
+        if (tCount) tCount.textContent = (item.likes || 0).toLocaleString('id-ID');
+    }
+}
+
+let commentTarget = null;
+async function openComments(type, idx) {
+    const item = getPlaylistItem(type, idx);
+    if (!item) return;
+    commentTarget = { type, idx, id: item.id };
+    document.getElementById('commentsModalTitle').textContent = `💬 Komentar — ${item.title}`;
+    let saved = '';
+    try { saved = localStorage.getItem('lorevia_comment_name') || ''; } catch (e) {}
+    document.getElementById('commentName').value = saved;
+    document.getElementById('commentText').value = '';
+    const modal = document.getElementById('commentsModal');
+    modal.classList.remove('hidden');
+    modal.classList.add('flex');
+    await renderCommentsList(true);
+}
+function closeComments() {
+    commentTarget = null;
+    const modal = document.getElementById('commentsModal');
+    modal.classList.add('hidden');
+    modal.classList.remove('flex');
+}
+async function renderCommentsList(reload) {
+    const t = commentTarget;
+    const list = document.getElementById('commentsList');
+    if (!t || !list) return;
+    if (reload) {
+        list.innerHTML = '<p class="text-sm text-gray-400 text-center py-8">Memuat komentar...</p>';
+        try { t.rows = await window.loreviaComments.list(t.id); }
+        catch (err) {
+            console.error(err);
+            list.innerHTML = '<p class="text-sm text-red-300 text-center py-8">Komentar tidak bisa dimuat: ' + escHtml(err.message || err) + '</p>';
+            return;
+        }
+        if (commentTarget !== t) return;
+    }
+    const rows = t.rows || [];
+    const isAdmin = typeof currentRoute !== 'undefined' && currentRoute === 'admin-dashboard';
+    list.innerHTML = rows.length === 0
+        ? '<p class="text-sm text-gray-400 text-center py-8">Belum ada komentar. Jadilah yang pertama berkomentar!</p>'
+        : rows.map(c => `
+            <div class="bg-forest-900/70 rounded-xl p-3 border border-forest-700">
+                <div class="flex items-center justify-between gap-2">
+                    <p class="text-sm font-semibold text-gold-400 truncate">${escHtml(c.name)}</p>
+                    <p class="text-[10px] text-gray-500 flex-shrink-0">${escHtml(c.date || '')}</p>
+                </div>
+                <p class="text-sm text-gray-200 mt-1 break-words whitespace-pre-line">${escHtml(c.text)}</p>
+                ${isAdmin ? `<button type="button" onclick="deleteComment('${escHtml(c._id)}')" class="text-[11px] text-red-400 mt-1">Hapus komentar</button>` : ''}
+            </div>`).join('');
+}
+async function submitComment(e) {
+    e.preventDefault();
+    const t = commentTarget;
+    if (!t) return;
+    const item = getPlaylistItem(t.type, t.idx);
+    if (!item) return;
+    const name = document.getElementById('commentName').value.trim().slice(0, 60);
+    const text = document.getElementById('commentText').value.trim().slice(0, 500);
+    if (!name || !text) return;
+    const btn = e.target.querySelector('button[type="submit"]');
+    if (btn) btn.disabled = true;
+    try {
+        const coll = t.type === 'video' ? 'videos' : 'audios';
+        const c = { type: t.type, itemId: String(item.id), name, text, ts: Date.now(),
+            date: new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' }) };
+        c._id = await window.loreviaComments.add(c);
+        item.commentCount = (item.commentCount || 0) + 1;
+        window.loreviaBump(coll, item.id, 'commentCount', 1);
+        try { localStorage.setItem('lorevia_comment_name', name); } catch (err) {}
+        document.getElementById('commentText').value = '';
+        t.rows = [c].concat(t.rows || []);
+        await renderCommentsList(false);
+        const label = document.getElementById(`${t.type}CommentCount_${t.idx}`);
+        if (label) label.textContent = item.commentCount;
+        if (typeof currentRoute !== 'undefined' && currentRoute !== 'video-playlist') renderView();
+    } catch (err) {
+        console.error(err);
+        alert('Komentar gagal dikirim: ' + (err.message || err));
+    }
+    if (btn) btn.disabled = false;
+}
+async function deleteComment(id) {
+    const t = commentTarget;
+    if (!t || !confirm('Hapus komentar ini?')) return;
+    try {
+        await window.loreviaComments.del(id);
+        const item = getPlaylistItem(t.type, t.idx);
+        if (item) { item.commentCount = Math.max(0, (item.commentCount || 0) - 1); window.loreviaBump(t.type === 'video' ? 'videos' : 'audios', item.id, 'commentCount', -1); }
+        t.rows = (t.rows || []).filter(c => c._id !== id);
+        await renderCommentsList(false);
+    } catch (err) { alert('Gagal menghapus: ' + (err.message || err)); }
+}
+
+async function updateAudio(idx) {
+    const a = appData.audios[idx];
+    if (!a) return;
+    const title = document.getElementById(`audTitleEdit_${idx}`).value.trim();
+    const artist = document.getElementById(`audArtistEdit_${idx}`).value.trim();
+    const kind = document.getElementById(`audKindEdit_${idx}`).value === 'cover' ? 'cover' : 'original';
+    const date = document.getElementById(`audDateEdit_${idx}`).value.trim();
+    const playlistId = document.getElementById(`audPlaylistEdit_${idx}`).value || null;
+    const thumbFile = document.getElementById(`audThumbEdit_${idx}`).files[0];
+    try {
+        let cover = a.cover || '';
+        if (thumbFile) cover = (await uploadMediaFiles([thumbFile], 'audio_cover_' + Date.now(), 150000))[0] || cover;
+        Object.assign(a, { title, artist, kind, date, playlistId, cover });
+        saveAppData();
+        await window.loreviaDbFlush();
+        alert('Audio berhasil diperbarui!');
+        renderView();
+    } catch (err) { alert('Gagal menyimpan: ' + (err.message || err)); }
 }
 
 
@@ -4166,6 +4331,49 @@ function renderView_history() {
 }
 
 
+// ======== Halaman: kerjasama ========
+// Halaman "Kerja Sama" (route: kerjasama): kerja sama Lorevia dengan agensi / mitra lain (terpisah dari History dan Medpart).
+function renderView_kerjasama() {
+    const content = document.getElementById('appContent');
+    if (currentRoute !== 'toko') stopPromoBanner();
+    if (currentRoute === 'kerjasama') {
+        const list = (appData.cooperations || []).slice().sort((a, b) => String(b.date).localeCompare(String(a.date)));
+        content.innerHTML = `
+            <div class="max-w-4xl mx-auto py-8 space-y-6">
+                <div class="text-center">
+                    <h2 class="font-serif text-3xl font-bold gold-text">Kerja Sama</h2>
+                    <p class="text-gray-300 mt-1">Kolaborasi Lorevia Entertainment dengan agensi dan mitra lain.</p>
+                </div>
+                <div class="space-y-6">
+                    ${list.length === 0 ? `
+                        <div class="text-center py-14 bg-forest-800/40 rounded-2xl border border-forest-700">
+                            <p class="text-gray-400 text-sm">Belum ada data kerja sama.</p>
+                        </div>
+                    ` : list.map(h => `
+                        <article class="bg-forest-800/80 p-5 md:p-6 rounded-2xl gold-border shadow-xl space-y-3">
+                            <div class="flex flex-wrap items-center justify-between gap-2 text-xs font-semibold">
+                                <span class="px-3 py-1 rounded-full bg-gold-600 text-black">Kerja sama dengan ${escHtml(h.partner)}</span>
+                                <span class="text-gold-400">${escHtml(fmtDate(h.date))}</span>
+                            </div>
+                            <h3 class="font-serif text-xl md:text-2xl font-bold text-white">${escHtml(h.title)}</h3>
+                            ${h.photo ? `<img src="${escHtml(h.photo)}" alt="${escHtml(h.title)}" class="w-full max-h-96 object-cover rounded-xl gold-border">` : ''}
+                            ${h.story ? `<div><p class="text-[11px] font-bold tracking-widest uppercase text-gold-400 mb-1">Latar Belakang ${escHtml(h.partner)}</p><div class="text-sm text-gray-200">${renderRich(h.story)}</div></div>` : ''}
+                            ${(h.contents || []).map(c => `
+                                <div class="bg-forest-900/60 rounded-xl p-4 border border-forest-700">
+                                    ${c.heading ? `<h4 class="font-serif font-bold text-gold-400 mb-1">${escHtml(c.heading)}</h4>` : ''}
+                                    <div class="text-sm text-gray-200">${renderRich(c.body)}</div>
+                                </div>
+                            `).join('')}
+                        </article>
+                    `).join('')}
+                </div>
+            </div>
+        `;
+    }
+    animatePageReveal();
+}
+
+
 // ======== Halaman: dispatch ========
 // Halaman "Dispatch Resmi" (route: dispatch): berita resmi dengan foto; link di dalam teks otomatis bisa diklik.
 function renderView_dispatch() {
@@ -4500,7 +4708,7 @@ async function loadVideoPlaylistData() { videoPlaylistLoaded = true; }   // data
                                                     <span id="videoLikeIcon_${idx}">${v._liked ? '❤️' : '🤍'}</span><span id="videoLikeCount_${idx}">${(v.likes || 0).toLocaleString('id-ID')}</span>
                                                 </button>
                                                 <button type="button" onclick="event.stopPropagation(); openComments('video', ${idx})" class="text-[11px] flex items-center gap-1 text-gray-400 hover:text-gold-400 transition">
-                                                    💬 <span>${(v.comments && v.comments.length) || 0}</span>
+                                                    💬 <span>${v.commentCount || 0}</span>
                                                 </button>
                                             </div>
                                         </div>
@@ -4568,7 +4776,8 @@ async function loadAudioPlaylistData() { audioPlaylistLoaded = true; }   // data
                                             <button onclick="playAudio(${idx})" id="audioPlayBtn_${idx}" class="absolute inset-0 w-full h-full bg-black/40 hover:bg-black/55 text-gold-400 flex items-center justify-center text-xl md:text-2xl transition">▶</button>
                                         </div>
                                         <div class="flex-1 min-w-0">
-                                            <p class="font-serif text-base md:text-lg font-bold text-white truncate">${a.title}</p>
+                                            <p class="font-serif text-base md:text-lg font-bold text-white truncate">${escHtml(a.title)}</p>
+                                            ${a.artist ? `<p class="text-xs text-gold-400 truncate">${escHtml(a.artist)} <span class="ml-1 px-1.5 py-0.5 rounded bg-forest-700 text-[9px] font-bold uppercase text-gray-200">${a.kind === 'cover' ? 'Cover' : 'Original'}</span></p>` : ''}
                                             <div class="flex items-center gap-2 mt-0.5">
                                                 ${a.date ? `<p class="text-[11px] text-gray-400">${a.date}</p>` : ''}
                                                 <span id="audioEq_${idx}" class="hidden eq-bars items-end gap-[2px] h-3"><i></i><i></i><i></i></span>
@@ -4587,7 +4796,7 @@ async function loadAudioPlaylistData() { audioPlaylistLoaded = true; }   // data
                                             <span id="audioLikeIcon_${idx}">${a._liked ? '❤️' : '🤍'}</span><span id="audioLikeCount_${idx}">${(a.likes || 0).toLocaleString('id-ID')}</span>
                                         </button>
                                         <button type="button" onclick="openComments('audio', ${idx})" class="text-xs flex items-center gap-1 text-gray-400 hover:text-gold-400 transition">
-                                            💬 <span>${(a.comments && a.comments.length) || 0}</span>
+                                            💬 <span>${a.commentCount || 0}</span>
                                         </button>
                                     </div>
                                     <audio id="audioPlayer_${idx}" ${String(a.data || '').indexOf('fs:') === 0 ? '' : 'src="' + a.data + '"'} class="hidden" preload="none"></audio>
@@ -4789,8 +4998,9 @@ async function loadAudioPlaylistData() { audioPlaylistLoaded = true; }   // data
                     { key: 'member', label: '🌱 Trainee / Member' },
                     { key: 'announce', label: '📢 Pengumuman & Penghargaan' },
                     { key: 'history', label: '📜 History Lorevia' },
+                    { key: 'coop', label: '🤝 Kerja Sama' },
                     { key: 'dispatch', label: '📰 Dispatch Resmi' },
-                    { key: 'medpart', label: '🤝 Promote Medpart' },
+                    { key: 'medpart', label: '▶ Promote Medpart' },
                     { key: 'video', label: '🎬 Video Playlist' },
                     { key: 'audio', label: '🎧 Audio Playlist' },
                     { key: 'store', label: '🛍️ Toko & Pesanan' },
@@ -5174,6 +5384,7 @@ async function loadAudioPlaylistData() { audioPlaylistLoaded = true; }   // data
 
                         ${adminTab === 'announce' ? renderAnnounceTab() : ''}
                         ${adminTab === 'history' ? renderHistoryTab() : ''}
+                        ${adminTab === 'coop' ? renderCoopTab() : ''}
                         ${adminTab === 'dispatch' ? renderDispatchTab() : ''}
                         ${adminTab === 'medpart' ? renderMedpartTab() : ''}
 
@@ -5222,6 +5433,7 @@ async function loadAudioPlaylistData() { audioPlaylistLoaded = true; }   // data
                                                 <input type="file" accept="image/*" id="vidThumbEdit_${idx}" class="w-full px-2 py-1.5 rounded bg-forest-800 border border-forest-600 text-[10px] text-white file:mr-1 file:py-0.5 file:px-1.5 file:rounded file:border-0 file:bg-gold-600 file:text-black file:text-[10px] file:font-bold">
                                                 <div class="flex gap-2">
                                                     <button type="button" onclick="updateVideo(${idx})" class="flex-1 py-1.5 rounded bg-gold-600 hover:bg-gold-500 text-black text-xs font-bold transition">Simpan</button>
+                                                    <button type="button" onclick="openComments('video', ${idx})" class="px-3 py-1.5 rounded bg-forest-700 text-gold-400 text-xs font-bold transition">Komentar</button>
                                                     <button type="button" onclick="deleteVideo(${idx})" class="px-3 py-1.5 rounded bg-red-600 hover:bg-red-500 text-white text-xs font-bold transition">Hapus</button>
                                                 </div>
                                             </div>
@@ -5243,13 +5455,15 @@ async function loadAudioPlaylistData() { audioPlaylistLoaded = true; }   // data
                                 <p class="text-[11px] text-gray-400 -mt-2">Unggah file audio (maks. 12 MB; tersimpan langsung di database). Statistik pendengar tampil otomatis di dekat tombol play.</p>
                                 <form onsubmit="addAudio(event)" class="grid grid-cols-1 sm:grid-cols-2 gap-3">
                                     <input type="text" id="audTitle" placeholder="Judul Audio" required class="sm:col-span-2 px-4 py-2.5 rounded-xl bg-forest-900 border border-forest-600 text-white text-sm outline-none">
+                                    <input type="text" id="audArtist" placeholder="Nama Artis / Penyanyi" required class="px-4 py-2.5 rounded-xl bg-forest-900 border border-forest-600 text-white text-sm outline-none">
+                                    <select id="audKind" class="px-4 py-2.5 rounded-xl bg-forest-900 border border-forest-600 text-white text-sm outline-none"><option value="original">Lagu Original (ORI)</option><option value="cover">Lagu Cover</option></select>
                                     <input type="text" id="audDate" placeholder="Tanggal (opsional)" class="px-4 py-2.5 rounded-xl bg-forest-900 border border-forest-600 text-white text-sm outline-none">
                                     <select id="audPlaylist" class="sm:col-span-2 px-4 py-2.5 rounded-xl bg-forest-900 border border-forest-600 text-white text-sm outline-none">
                                         <option value="">Tanpa Playlist</option>
                                         ${appData.audioPlaylists.map(p => `<option value="${p.id}">${p.name}</option>`).join('')}
                                     </select>
                                     <input type="file" accept="audio/*" id="audFile" required title="Maks. 12 MB" class="px-4 py-2.5 rounded-xl bg-forest-900 border border-forest-600 text-white text-xs outline-none file:mr-2 file:py-1 file:px-2 file:rounded file:border-0 file:bg-gold-600 file:text-black file:text-xs file:font-bold">
-                                    <input type="file" accept="image/*" id="audThumb" class="px-4 py-2.5 rounded-xl bg-forest-900 border border-forest-600 text-white text-xs outline-none file:mr-2 file:py-1 file:px-2 file:rounded file:border-0 file:bg-gold-600 file:text-black file:text-xs file:font-bold" title="Thumbnail/Cover (opsional)">
+                                    <input type="file" accept="image/*" id="audThumb" class="px-4 py-2.5 rounded-xl bg-forest-900 border border-forest-600 text-white text-xs outline-none file:mr-2 file:py-1 file:px-2 file:rounded file:border-0 file:bg-gold-600 file:text-black file:text-xs file:font-bold" title="Gambar cover lagu (opsional)">
                                     <button type="submit" id="audSubmitBtn" class="sm:col-span-2 py-2.5 rounded-xl bg-gold-600 hover:bg-gold-500 text-black font-bold text-sm transition">Tambah Audio</button>
                                 </form>
                             </div>
@@ -5267,14 +5481,17 @@ async function loadAudioPlaylistData() { audioPlaylistLoaded = true; }   // data
                                                     ${a.cover ? `<img src="${a.cover}" class="w-full h-full object-cover" alt="Cover">` : '🎧'}
                                                 </div>
                                                 <div class="flex-1 min-w-[140px]">
-                                                    <p class="text-sm font-semibold text-gold-400 line-clamp-1">${a.title}</p>
-                                                    <p class="text-[10px] text-gray-400">${(a.plays || 0).toLocaleString('id-ID')} pendengar${a.date ? ' · ' + a.date : ''}</p>
+                                                    <p class="text-sm font-semibold text-gold-400 line-clamp-1">${escHtml(a.title)}</p>
+                                                    <p class="text-[11px] text-gray-300">${escHtml(a.artist || '-')} · ${a.kind === 'cover' ? 'Cover' : 'Original'}</p>
+                                                    <p class="text-[10px] text-gray-400">${(a.plays || 0).toLocaleString('id-ID')} pendengar · ❤ ${(a.likes || 0)} · 💬 ${(a.commentCount || 0)}${a.date ? ' · ' + a.date : ''}</p>
                                                     ${a.playlistId ? (() => { const pl = appData.audioPlaylists.find(p => p.id === a.playlistId); return pl ? `<span class="inline-block text-[9px] font-bold px-2 py-0.5 rounded-full bg-gold-600/20 text-gold-400 border border-gold-600/40 mt-1">🎧 ${pl.name}</span>` : ''; })() : ''}
                                                 </div>
                                                 ${String(a.data || '').indexOf('fs:') === 0 ? `<button type="button" onclick="adminLoadAudio(${idx}, this)" class="px-3 py-1.5 rounded bg-forest-800 border border-gold-600/50 text-gold-400 text-xs font-semibold">▶ Putar</button>` : `<audio controls src="${a.data}" class="h-8 max-w-[220px] w-full sm:w-auto"></audio>`}
                                             </div>
                                             <div class="grid grid-cols-1 sm:grid-cols-3 gap-2">
-                                                <input type="text" value="${a.title}" id="audTitleEdit_${idx}" placeholder="Judul Audio" class="px-2 py-1.5 rounded bg-forest-800 border border-forest-600 text-xs text-white">
+                                                <input type="text" value="${escHtml(a.title)}" id="audTitleEdit_${idx}" placeholder="Judul Audio" class="px-2 py-1.5 rounded bg-forest-800 border border-forest-600 text-xs text-white">
+                                                <input type="text" value="${escHtml(a.artist || '')}" id="audArtistEdit_${idx}" placeholder="Artis" class="px-2 py-1.5 rounded bg-forest-800 border border-forest-600 text-xs text-white">
+                                                <select id="audKindEdit_${idx}" class="px-2 py-1.5 rounded bg-forest-800 border border-forest-600 text-xs text-white"><option value="original" ${a.kind !== 'cover' ? 'selected' : ''}>Original (ORI)</option><option value="cover" ${a.kind === 'cover' ? 'selected' : ''}>Cover</option></select>
                                                 <input type="text" value="${a.date || ''}" id="audDateEdit_${idx}" placeholder="Tanggal" class="px-2 py-1.5 rounded bg-forest-800 border border-forest-600 text-xs text-white">
                                                 <input type="file" accept="image/*" id="audThumbEdit_${idx}" class="px-2 py-1.5 rounded bg-forest-800 border border-forest-600 text-[10px] text-white file:mr-1 file:py-0.5 file:px-1.5 file:rounded file:border-0 file:bg-gold-600 file:text-black file:text-[10px] file:font-bold">
                                             </div>
@@ -5284,6 +5501,7 @@ async function loadAudioPlaylistData() { audioPlaylistLoaded = true; }   // data
                                             </select>
                                             <div class="flex gap-2">
                                                 <button type="button" onclick="updateAudio(${idx})" class="flex-1 py-1.5 rounded bg-gold-600 hover:bg-gold-500 text-black text-xs font-bold transition">Simpan</button>
+                                                <button type="button" onclick="openComments('audio', ${idx})" class="py-1.5 px-3 rounded bg-forest-700 text-gold-400 text-xs font-bold transition">Komentar</button>
                                                 <button type="button" onclick="deleteAudio(${idx})" class="py-1.5 px-3 rounded bg-red-600 hover:bg-red-500 text-white text-xs font-bold transition">Hapus</button>
                                             </div>
                                         </div>
@@ -5312,6 +5530,7 @@ const PAGE_RENDERERS = {
     'pengumuman': renderView_pengumuman,
     'achievement': renderView_achievement,
     'history': renderView_history,
+    'kerjasama': renderView_kerjasama,
     'dispatch': renderView_dispatch,
     'medpart': renderView_medpart,
     'struktur': renderView_struktur,
