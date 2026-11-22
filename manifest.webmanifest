@@ -1,0 +1,46 @@
+{
+ "name": "Lorevia Entertainment RVN",
+ "short_name": "Lorevia",
+ "description": "Aplikasi resmi Lorevia Entertainment RVN",
+ "start_url": "./",
+ "scope": "./",
+ "display": "standalone",
+ "orientation": "portrait",
+ "background_color": "#24240C",
+ "theme_color": "#24240C",
+ "lang": "id",
+ "icons": [
+  {
+   "src": "icon-192.png",
+   "sizes": "192x192",
+   "type": "image/png",
+   "purpose": "any"
+  },
+  {
+   "src": "icon-512.png",
+   "sizes": "512x512",
+   "type": "image/png",
+   "purpose": "any"
+  },
+  {
+   "src": "icon-512.png",
+   "sizes": "512x512",
+   "type": "image/png",
+   "purpose": "maskable"
+  }
+ ],
+ "shortcuts": [
+  {
+   "name": "Aktivitas",
+   "url": "./?p=aktivitas"
+  },
+  {
+   "name": "Members",
+   "url": "./?p=member"
+  },
+  {
+   "name": "Pengumuman",
+   "url": "./?p=pengumuman"
+  }
+ ]
+}
