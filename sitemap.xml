@@ -1,16 +1,16 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:image="http://www.google.com/schemas/sitemap-image/1.1">
-  <url><loc>https://lorevia-ent-web.vercel.app/</loc><changefreq>weekly</changefreq><priority>1.0</priority><image:image><image:loc>https://lorevia-ent-web.vercel.app/logo.png</image:loc><image:title>Lorevia Entertainment</image:title></image:image><image:image><image:loc>https://lorevia-ent-web.vercel.app/og-image.jpg</image:loc><image:title>Lorevia Entertainment</image:title></image:image><image:image><image:loc>https://drive.google.com/thumbnail?id=1Ju_A5tqOZ0x9zqGG7iGQ8y-87D8cCoQD&amp;sz=w1000</image:loc><image:title>Lorevia Entertainment</image:title></image:image><image:image><image:loc>https://drive.google.com/thumbnail?id=1PeGxo4WVDZ4bqmbzbeKewPDf8JZFBNfh&amp;sz=w1000</image:loc><image:title>Lorevia Entertainment</image:title></image:image><image:image><image:loc>https://drive.google.com/thumbnail?id=124THA9ngllcUc9ICfe5BL19khsXKa9ne&amp;sz=w1000</image:loc><image:title>Lorevia Entertainment</image:title></image:image></url>
-  <url><loc>https://lorevia-ent-web.vercel.app/?p=about</loc><changefreq>weekly</changefreq><priority>0.6</priority></url>
-  <url><loc>https://lorevia-ent-web.vercel.app/?p=history</loc><changefreq>weekly</changefreq><priority>0.6</priority></url>
-  <url><loc>https://lorevia-ent-web.vercel.app/?p=kerjasama</loc><changefreq>weekly</changefreq><priority>0.6</priority></url>
-  <url><loc>https://lorevia-ent-web.vercel.app/?p=aktivitas</loc><changefreq>weekly</changefreq><priority>0.6</priority></url>
-  <url><loc>https://lorevia-ent-web.vercel.app/?p=struktur</loc><changefreq>weekly</changefreq><priority>0.6</priority></url>
-  <url><loc>https://lorevia-ent-web.vercel.app/?p=member</loc><changefreq>weekly</changefreq><priority>0.6</priority></url>
-  <url><loc>https://lorevia-ent-web.vercel.app/?p=pengumuman</loc><changefreq>weekly</changefreq><priority>0.6</priority></url>
-  <url><loc>https://lorevia-ent-web.vercel.app/?p=achievement</loc><changefreq>weekly</changefreq><priority>0.6</priority></url>
-  <url><loc>https://lorevia-ent-web.vercel.app/?p=medpart</loc><changefreq>weekly</changefreq><priority>0.6</priority></url>
-  <url><loc>https://lorevia-ent-web.vercel.app/?p=toko</loc><changefreq>weekly</changefreq><priority>0.6</priority></url>
-  <url><loc>https://lorevia-ent-web.vercel.app/?p=dispatch</loc><changefreq>weekly</changefreq><priority>0.6</priority></url>
-  <url><loc>https://lorevia-ent-web.vercel.app/?p=guestbox</loc><changefreq>weekly</changefreq><priority>0.6</priority></url>
+  <url><loc>https://lorevia-entertainment-web.vercel.app/</loc><changefreq>weekly</changefreq><priority>1.0</priority><image:image><image:loc>https://lorevia-entertainment-web.vercel.app/logo.png</image:loc><image:title>Lorevia Entertainment</image:title></image:image><image:image><image:loc>https://lorevia-entertainment-web.vercel.app/og-image.jpg</image:loc><image:title>Lorevia Entertainment</image:title></image:image><image:image><image:loc>https://drive.google.com/thumbnail?id=1Ju_A5tqOZ0x9zqGG7iGQ8y-87D8cCoQD&amp;sz=w1000</image:loc><image:title>Lorevia Entertainment</image:title></image:image><image:image><image:loc>https://drive.google.com/thumbnail?id=1PeGxo4WVDZ4bqmbzbeKewPDf8JZFBNfh&amp;sz=w1000</image:loc><image:title>Lorevia Entertainment</image:title></image:image><image:image><image:loc>https://drive.google.com/thumbnail?id=124THA9ngllcUc9ICfe5BL19khsXKa9ne&amp;sz=w1000</image:loc><image:title>Lorevia Entertainment</image:title></image:image></url>
+  <url><loc>https://lorevia-entertainment-web.vercel.app/?p=about</loc><changefreq>weekly</changefreq><priority>0.6</priority></url>
+  <url><loc>https://lorevia-entertainment-web.vercel.app/?p=history</loc><changefreq>weekly</changefreq><priority>0.6</priority></url>
+  <url><loc>https://lorevia-entertainment-web.vercel.app/?p=kerjasama</loc><changefreq>weekly</changefreq><priority>0.6</priority></url>
+  <url><loc>https://lorevia-entertainment-web.vercel.app/?p=aktivitas</loc><changefreq>weekly</changefreq><priority>0.6</priority></url>
+  <url><loc>https://lorevia-entertainment-web.vercel.app/?p=struktur</loc><changefreq>weekly</changefreq><priority>0.6</priority></url>
+  <url><loc>https://lorevia-entertainment-web.vercel.app/?p=member</loc><changefreq>weekly</changefreq><priority>0.6</priority></url>
+  <url><loc>https://lorevia-entertainment-web.vercel.app/?p=pengumuman</loc><changefreq>weekly</changefreq><priority>0.6</priority></url>
+  <url><loc>https://lorevia-entertainment-web.vercel.app/?p=achievement</loc><changefreq>weekly</changefreq><priority>0.6</priority></url>
+  <url><loc>https://lorevia-entertainment-web.vercel.app/?p=medpart</loc><changefreq>weekly</changefreq><priority>0.6</priority></url>
+  <url><loc>https://lorevia-entertainment-web.vercel.app/?p=toko</loc><changefreq>weekly</changefreq><priority>0.6</priority></url>
+  <url><loc>https://lorevia-entertainment-web.vercel.app/?p=dispatch</loc><changefreq>weekly</changefreq><priority>0.6</priority></url>
+  <url><loc>https://lorevia-entertainment-web.vercel.app/?p=guestbox</loc><changefreq>weekly</changefreq><priority>0.6</priority></url>
 </urlset>

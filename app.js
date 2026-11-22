@@ -845,7 +845,7 @@ async function kirimKeSheet(type, data) {
         }
 
         // Perbarui alamat kanonik & robots sesuai halaman (dasbor admin tidak boleh diindeks)
-        const SITE_URL = 'https://lorevia-ent-web.vercel.app/';
+        const SITE_URL = 'https://lorevia-entertainment-web.vercel.app/';
         function updateSeoTags(route) {
             const canon = document.querySelector('link[rel="canonical"]');
             if (canon) canon.setAttribute('href', route === 'beranda' || route === 'admin-dashboard' ? SITE_URL : SITE_URL + '?p=' + route);
@@ -1744,7 +1744,7 @@ async function kirimKeSheet(type, data) {
             if (location.hash === ADMIN_HASH) {
                 history.replaceState(null, '', location.pathname + location.search);
             }
-            if (window.APP_KIND === 'admin') { location.href = 'index.html'; return; }
+            if (window.APP_KIND === 'admin') { location.href = '/'; return; }
             showRoute('beranda', true);
         }
 
@@ -2562,6 +2562,7 @@ function normTiktok(v) {
 }
 function genName(id) { const g = (appData.generations || []).find(x => x.id === id); return g ? g.name : 'Tanpa generasi'; }
 
+let lastMemberGen = '';
 function renderMembersTab() {
     const e = adminEditing('members');
     const gens = appData.generations || [];
@@ -2586,7 +2587,7 @@ function renderMembersTab() {
             <form id="form_members" onsubmit="saveMember(event)" class="space-y-3">
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <div><label class="${A_LBL}">Generasi</label>
-                        <select id="mGen" required class="${A_INP}">${gens.length ? gens.map(g => `<option value="${escHtml(g.id)}" ${e && e.genId === g.id ? 'selected' : ''}>${escHtml(g.name)}</option>`).join('') : '<option value="">(tambah generasi dulu)</option>'}</select></div>
+                        <select id="mGen" required onchange="lastMemberGen = this.value" class="${A_INP}">${gens.length ? gens.map(g => `<option value="${escHtml(g.id)}" ${(e ? e.genId : (gens.some(x => x.id === lastMemberGen) ? lastMemberGen : gens[0].id)) === g.id ? 'selected' : ''}>${escHtml(g.name)}</option>`).join('') : '<option value="">(tambah generasi dulu)</option>'}</select></div>
                     <div><label class="${A_LBL}">Nama</label><input type="text" id="mName" required value="${escHtml(e ? e.name : '')}" class="${A_INP}"></div>
                     <div><label class="${A_LBL}">Date of Birth</label><input type="date" id="mDob" value="${escHtml(e && /^\d{4}-\d{2}-\d{2}$/.test(e.dob || '') ? e.dob : '')}" class="${A_INP}"></div>
                     <div><label class="${A_LBL}">Face Claim</label><input type="text" id="mFace" value="${escHtml(e ? e.faceClaim || '' : '')}" placeholder="cth: Jisoo" class="${A_INP}"></div>
@@ -2604,7 +2605,9 @@ function addGeneration(e) {
     const name = document.getElementById('genNewName').value.trim();
     if (!name) return;
     if ((appData.generations || []).some(g => g.name.toLowerCase() === name.toLowerCase())) { alert('Generasi itu sudah ada.'); return; }
-    appData.generations.push({ id: 'gen_' + Date.now().toString(36), name });
+    const gid = 'gen_' + Date.now().toString(36);
+    appData.generations.push({ id: gid, name });
+    lastMemberGen = gid;
     commitAdminChange('Generasi ditambahkan!');
 }
 function renameGeneration(i) {
@@ -2620,7 +2623,7 @@ function deleteGeneration(i) {
     if (appData.members.some(m => m.genId === g.id)) { alert('Generasi masih punya member. Pindahkan atau hapus member-nya dulu.'); return; }
     if (!confirm('Hapus ' + g.name + '?')) return;
     appData.generations.splice(i, 1);
-    saveAppData(); renderView();
+    commitAdminChange('Generasi dihapus.');
 }
 async function saveMember(e) {
     e.preventDefault();
@@ -2628,6 +2631,7 @@ async function saveMember(e) {
         const ed = adminEditing('members');
         const genId = document.getElementById('mGen').value;
         if (!genId) throw adminFail('Tambahkan generasi dulu.');
+        lastMemberGen = genId;
         const data = {
             genId, name: document.getElementById('mName').value.trim(),
             dob: document.getElementById('mDob').value || (ed ? ed.dob || '' : ''),
@@ -4450,7 +4454,7 @@ function renderView() {
 // Mode aplikasi: banner unduh (PWA), tombol suara, tab bar bawah & menu "launcher" saat dipasang sebagai aplikasi.
 (function () {
     var ADMIN = window.APP_KIND === 'admin';
-    var APP_FILE = ADMIN ? 'lorevia-admin.html' : 'lorevia-app.html';
+    var APP_FILE = ADMIN ? '/lorevia-admin.html' : '/lorevia-app.html';
     var DKEY = ADMIN ? 'lorevia_admin_dismiss' : 'lorevia_app_dismiss';
     function modeClass() { return ADMIN ? 'admin-app' : 'app-mode'; }
     function standalone() {
@@ -4548,7 +4552,7 @@ function renderView() {
         if (standalone()) document.documentElement.classList.add(modeClass());
         headerButtons(); build();
         if ('serviceWorker' in navigator && location.protocol.indexOf('http') === 0) {
-            navigator.serviceWorker.register('sw.js').catch(function () {});
+            navigator.serviceWorker.register('/sw.js').catch(function () {});
         }
         // Beri banner juga di browser yang tidak mengirim beforeinstallprompt (mis. iOS)
         setTimeout(function () { if (!deferred) showBanner(); }, 2500);

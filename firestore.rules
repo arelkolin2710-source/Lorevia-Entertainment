@@ -2,15 +2,195 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // Situs ini tidak memakai login, jadi semua orang yang membuka situs boleh membaca/menulis
-    // koleksi di bawah (pengunjung perlu menulis: pendaftaran, guest box, pesanan, komentar, like).
-    // Hanya koleksi yang dipakai situs yang diizinkan; koleksi lain ditolak.
-    match /{col}/{docId} {
-      allow read, write: if col in [
-        'settings', 'announcements', 'achievements', 'adminStructure', 'members',
-        'managementList', 'traineeSubmissions', 'managementSubmissions', 'guestBoxes',
-        'products', 'orders', 'promos', 'videoPlaylists', 'audioPlaylists', 'videos', 'audios', 'forms', 'slotUsage'
-      ];
+    // =====================================================================
+    // FUNGSI BANTU
+    // Situs tidak memakai login, jadi semua orang boleh baca/tulis.
+    // Aturan di bawah membatasi KOLEKSI yang boleh dipakai dan memeriksa bentuk data dasar.
+    // Pemeriksaan hanya berlaku kalau kolomnya ada, supaya data lama tidak ditolak.
+    // =====================================================================
+    function small() {
+      return request.resource.data.keys().size() <= 80;
     }
+    function text(f, max) {
+      return !(f in request.resource.data)
+          || (request.resource.data[f] is string && request.resource.data[f].size() <= max);
+    }
+    function num(f) {
+      return !(f in request.resource.data) || request.resource.data[f] is number;
+    }
+    function ok(f1, m1) {
+      return small() && text(f1, m1);
+    }
+
+    // =====================================================================
+    // PENGATURAN UMUM (cadangan; saat ini tidak dipakai)
+    // =====================================================================
+    match /settings/{id} {
+      allow read: if true;
+      allow create, update: if small();
+      allow delete: if false;
+    }
+
+    // =====================================================================
+    // FITUR: PENGUMUMAN (foto opsional + isi "baca selengkapnya")
+    // =====================================================================
+    match /announcements/{id} {
+      allow read: if true;
+      allow create, update: if ok('title', 300) && text('content', 200000) && text('date', 60);
+      allow delete: if true;
+    }
+
+    // =====================================================================
+    // FITUR: ACHIEVEMENT / PENGHARGAAN
+    // =====================================================================
+    match /achievements/{id} {
+      allow read: if true;
+      allow create, update: if ok('title', 300) && text('desc', 200000) && text('year', 30);
+      allow delete: if true;
+    }
+
+    // =====================================================================
+    // FITUR: HISTORY LOREVIA (foto, cerita latar belakang, beberapa isi, tanggal)
+    // =====================================================================
+    match /histories/{id} {
+      allow read: if true;
+      allow create, update: if ok('title', 300) && text('date', 60) && text('story', 200000);
+      allow delete: if true;
+    }
+
+    // =====================================================================
+    // FITUR: KERJA SAMA / COOPERATION (terpisah dari History & Medpart)
+    // =====================================================================
+    match /cooperations/{id} {
+      allow read: if true;
+      allow create, update: if ok('title', 300) && text('partner', 300) && text('date', 60) && text('story', 200000);
+      allow delete: if true;
+    }
+
+    // =====================================================================
+    // FITUR: DISPATCH / BERITA RESMI (foto + teks dengan link otomatis)
+    // =====================================================================
+    match /dispatches/{id} {
+      allow read: if true;
+      allow create, update: if ok('title', 300) && text('date', 60) && text('content', 200000);
+      allow delete: if true;
+    }
+
+    // =====================================================================
+    // FITUR: OFFICIAL PROMOTE MEDPART (poster + video YouTube)
+    // =====================================================================
+    match /medparts/{id} {
+      allow read: if true;
+      allow create, update: if ok('title', 300) && text('partner', 300) && text('date', 60) && text('desc', 200000);
+      allow delete: if true;
+    }
+
+    // =====================================================================
+    // FITUR: STRUKTUR ADMIN (bagan organisasi)
+    // =====================================================================
+    match /adminStructure/{id} {
+      allow read: if true;
+      allow create, update: if ok('name', 200) && text('role', 200);
+      allow delete: if true;
+    }
+
+    // =====================================================================
+    // FITUR: GENERASI (Gen 1, Gen 2, ... diatur dari dasbor admin)
+    // =====================================================================
+    match /generations/{id} {
+      allow read: if true;
+      allow create, update: if ok('name', 100);
+      allow delete: if true;
+    }
+
+    // =====================================================================
+    // FITUR: MEMBERS / ARTIS (nama, tanggal lahir, face claim, link TikTok, foto, generasi)
+    // =====================================================================
+    match /members/{id} {
+      allow read: if true;
+      allow create, update: if ok('name', 200) && text('dob', 30) && text('faceClaim', 200) && text('tiktok', 300) && text('genId', 80);
+      allow delete: if true;
+    }
+
+    // =====================================================================
+    // FITUR: GUEST BOX (pesan pengunjung)
+    // =====================================================================
+    match /guestBoxes/{id} {
+      allow read: if true;
+      allow create, update: if ok('name', 100) && text('message', 1000);
+      allow delete: if true;
+    }
+
+    // =====================================================================
+    // FITUR: TOKO (produk + carousel foto, promo, pesanan)
+    // =====================================================================
+    match /products/{id} {
+      allow read: if true;
+      allow create, update: if ok('name', 300) && text('description', 5000) && num('price') && num('qty');
+      allow delete: if true;
+    }
+    match /promos/{id} {
+      allow read: if true;
+      allow create, update: if ok('code', 60);
+      allow delete: if true;
+    }
+    match /orders/{id} {
+      allow read: if true;
+      allow create, update: if small();
+      allow delete: if true;
+    }
+
+    // =====================================================================
+    // FITUR: VIDEO PLAYLIST
+    // =====================================================================
+    match /videoPlaylists/{id} {
+      allow read: if true;
+      allow create, update: if ok('name', 200) && text('desc', 2000);
+      allow delete: if true;
+    }
+    match /videos/{id} {
+      allow read: if true;
+      allow create, update: if ok('title', 300) && num('likes') && num('views') && num('commentCount');
+      allow delete: if true;
+    }
+
+    // =====================================================================
+    // FITUR: AUDIO PLAYLIST
+    // =====================================================================
+    match /audioPlaylists/{id} {
+      allow read: if true;
+      allow create, update: if ok('name', 200) && text('desc', 2000);
+      allow delete: if true;
+    }
+    match /audios/{id} {
+      allow read: if true;
+      allow create, update: if ok('title', 300) && text('artist', 200) && text('kind', 20) && num('likes') && num('plays') && num('commentCount');
+      allow delete: if true;
+    }
+
+    // =====================================================================
+    // FITUR: FILE VIDEO & AUDIO (dipecah per potongan ~525 KB)
+    // =====================================================================
+    match /mediaChunks/{id} {
+      allow read: if true;
+      allow create, update: if small() && request.resource.data.d is string && request.resource.data.d.size() <= 800000;
+      allow delete: if true;
+    }
+
+    // =====================================================================
+    // FITUR: KOMENTAR VIDEO & AUDIO (siapa pun boleh berkomentar; tidak bisa diedit)
+    // =====================================================================
+    match /comments/{id} {
+      allow read: if true;
+      allow create: if small()
+                    && request.resource.data.type in ['video', 'audio']
+                    && request.resource.data.itemId is string
+                    && request.resource.data.name is string && request.resource.data.name.size() > 0 && request.resource.data.name.size() <= 60
+                    && request.resource.data.text is string && request.resource.data.text.size() > 0 && request.resource.data.text.size() <= 500;
+      allow update: if false;
+      allow delete: if true;
+    }
+
+    // Koleksi lain yang tidak terdaftar di atas otomatis ditolak.
   }
 }
