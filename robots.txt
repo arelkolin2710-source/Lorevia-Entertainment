@@ -1,6 +1,7 @@
 User-agent: *
 Allow: /
+Disallow: /admin/
 Disallow: /admin.html
 Disallow: /lorevia-admin.html
 
-Sitemap: https://lorevia-ent-web.vercel.app/sitemap.xml
+Sitemap: https://lorevia-entertainment-web.vercel.app/sitemap.xml

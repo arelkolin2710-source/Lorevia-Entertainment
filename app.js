@@ -845,7 +845,7 @@ async function kirimKeSheet(type, data) {
         }
 
         // Perbarui alamat kanonik & robots sesuai halaman (dasbor admin tidak boleh diindeks)
-        const SITE_URL = 'https://lorevia-ent-web.vercel.app/';
+        const SITE_URL = 'https://lorevia-entertainment-web.vercel.app/';
         function updateSeoTags(route) {
             const canon = document.querySelector('link[rel="canonical"]');
             if (canon) canon.setAttribute('href', route === 'beranda' || route === 'admin-dashboard' ? SITE_URL : SITE_URL + '?p=' + route);
@@ -1744,7 +1744,7 @@ async function kirimKeSheet(type, data) {
             if (location.hash === ADMIN_HASH) {
                 history.replaceState(null, '', location.pathname + location.search);
             }
-            if (window.APP_KIND === 'admin') { location.href = 'index.html'; return; }
+            if (window.APP_KIND === 'admin') { location.href = '/'; return; }
             showRoute('beranda', true);
         }
 
@@ -4450,7 +4450,7 @@ function renderView() {
 // Mode aplikasi: banner unduh (PWA), tombol suara, tab bar bawah & menu "launcher" saat dipasang sebagai aplikasi.
 (function () {
     var ADMIN = window.APP_KIND === 'admin';
-    var APP_FILE = ADMIN ? 'lorevia-admin.html' : 'lorevia-app.html';
+    var APP_FILE = ADMIN ? '/lorevia-admin.html' : '/lorevia-app.html';
     var DKEY = ADMIN ? 'lorevia_admin_dismiss' : 'lorevia_app_dismiss';
     function modeClass() { return ADMIN ? 'admin-app' : 'app-mode'; }
     function standalone() {
@@ -4548,7 +4548,7 @@ function renderView() {
         if (standalone()) document.documentElement.classList.add(modeClass());
         headerButtons(); build();
         if ('serviceWorker' in navigator && location.protocol.indexOf('http') === 0) {
-            navigator.serviceWorker.register('sw.js').catch(function () {});
+            navigator.serviceWorker.register('/sw.js').catch(function () {});
         }
         // Beri banner juga di browser yang tidak mengirim beforeinstallprompt (mis. iOS)
         setTimeout(function () { if (!deferred) showBanner(); }, 2500);
