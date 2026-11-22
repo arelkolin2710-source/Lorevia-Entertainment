@@ -693,20 +693,21 @@ html.protect-content img { -webkit-user-drag: none; user-drag: none; -webkit-tou
 .activity-tabs button.on { background: #DC840C; color: #000; }
 
 /* ===== Banner unduh aplikasi ===== */
-#installBanner { position: fixed; left: 12px; right: 12px; bottom: 14px; z-index: 90; display: flex; justify-content: center;
-    transform: translateY(140%); opacity: 0; transition: transform .45s cubic-bezier(.2,.9,.3,1.2), opacity .3s; pointer-events: none; }
-#installBanner.show { transform: none; opacity: 1; pointer-events: auto; }
-#installBanner .ib-card { width: 100%; max-width: 520px; display: flex; align-items: center; gap: 12px; padding: 10px 12px;
+#installBanner { position: fixed; inset: 0; z-index: 90; display: flex; align-items: center; justify-content: center; padding: 20px;
+    background: rgba(0,0,0,.55); opacity: 0; transition: opacity .3s; pointer-events: none; }
+#installBanner.show { opacity: 1; pointer-events: auto; }
+#installBanner.show .ib-card { transform: none; }
+#installBanner .ib-card { width: 100%; max-width: 320px; display: flex; flex-direction: column; text-align: center; align-items: center; gap: 12px; padding: 22px 18px 18px; position: relative; transform: translateY(24px) scale(.96); transition: transform .35s cubic-bezier(.2,.9,.3,1.2);
     border-radius: 20px; background: linear-gradient(135deg, #24240C, #3a3a14); border: 1.5px solid #d4a017; color: #fff;
     box-shadow: 0 12px 40px rgba(0,0,0,.45); }
-#installBanner .ib-logo { width: 52px; height: 52px; border-radius: 14px; object-fit: cover; border: 1.5px solid #d4a017; flex-shrink: 0; }
-#installBanner .ib-text { flex: 1; min-width: 0; display: flex; flex-direction: column; line-height: 1.25; }
+#installBanner .ib-logo { width: 76px; height: 76px; border-radius: 14px; object-fit: cover; border: 1.5px solid #d4a017; flex-shrink: 0; }
+#installBanner .ib-text { display: flex; flex-direction: column; line-height: 1.3; gap: 4px; }
 #installBanner .ib-text b { font-size: .95rem; color: #f5c542; }
 #installBanner .ib-text span { font-size: .72rem; color: #e5e7d0; opacity: .85; }
 #installBanner .ib-go { display: inline-flex; align-items: center; gap: 6px; padding: 9px 14px; border-radius: 999px; border: 0; cursor: pointer;
     background: linear-gradient(135deg, #f97316, #f5c542); color: #1b1b08; font-weight: 700; font-size: .8rem; }
 #installBanner .ib-go .ico { width: 1.1rem; height: 1.1rem; }
-#installBanner .ib-x { background: none; border: 0; color: #fff; opacity: .6; font-size: 1.4rem; line-height: 1; cursor: pointer; padding: 0 4px; }
+#installBanner .ib-x { position: absolute; top: 6px; right: 10px; background: none; border: 0; color: #fff; opacity: .6; font-size: 1.4rem; line-height: 1; cursor: pointer; padding: 0 4px; }
 .snd-btn { position: relative; } .snd-btn .slash { display: none; position: absolute; left: 20%; right: 20%; top: 50%; height: 2px; background: currentColor; transform: rotate(-40deg); }
 .snd-btn.is-muted { opacity: .6; } .snd-btn.is-muted .slash { display: block; }
 
@@ -740,3 +741,28 @@ html.app-mode #appTabs { position: fixed; left: 10px; right: 10px; bottom: calc(
 .app-tile .at-ico { width: 46px; height: 46px; border-radius: 16px; display: grid; place-items: center; background: linear-gradient(135deg, #f97316, #f5c542); color: #1b1b08; }
 .app-tile .ico { width: 1.5rem; height: 1.5rem; }
 @keyframes amUp { from { transform: translateY(100%); } to { transform: none; } }
+
+/* ===== Header & tombol rapi di semua layar (tidak melebar keluar layar) ===== */
+html, body { overflow-x: hidden; max-width: 100%; }
+header.sticky { padding: 8px 12px !important; gap: 8px; min-width: 0; }
+header.sticky > div:first-child { min-width: 0; flex: 1 1 auto; gap: 8px; }
+header.sticky > div:first-child > div { width: 34px !important; height: 34px !important; flex-shrink: 0; }
+header.sticky .gold-text { font-size: 1rem !important; line-height: 1.15; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: block; min-width: 0; }
+header.sticky > div:last-child { flex: 0 0 auto; gap: 6px !important; margin: 0 !important; }
+header.sticky > div:last-child > * { margin: 0 !important; }
+header.sticky button { width: 34px; height: 34px; padding: 0 !important; display: inline-flex; align-items: center; justify-content: center; }
+header.sticky button svg { width: 18px !important; height: 18px !important; }
+header.sticky button:hover, header.sticky button:active { transform: none !important; }
+@media (max-width: 380px) { header.sticky .gold-text { font-size: .9rem !important; } }
+html.app-mode header.sticky .gold-text { font-size: 1rem !important; }
+#appContent { overflow-x: hidden; max-width: 100%; }
+#appContent img, #appContent video, #appContent iframe { max-width: 100%; }
+#appContent button { max-width: 100%; }
+header.sticky { display: flex !important; align-items: center; justify-content: space-between; }
+header.sticky > div { display: flex; align-items: center; }
+
+/* ===== Aplikasi Admin (admin.html dipasang sebagai aplikasi) ===== */
+html.admin-app header.sticky { background: linear-gradient(180deg, #7f1d1d 0%, #24240C 100%) !important; border-bottom: 2px solid #d4a017 !important; border-radius: 0 0 22px 22px; }
+html.admin-app header.sticky button[onclick="toggleSidebar()"] { display: none; }
+html.admin-app #sidebar, html.admin-app #sidebarOverlay, html.admin-app footer { display: none !important; }
+html.admin-app #appContent { padding: 12px 12px 28px !important; }

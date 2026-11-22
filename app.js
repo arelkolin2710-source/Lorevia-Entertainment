@@ -1744,6 +1744,7 @@ async function kirimKeSheet(type, data) {
             if (location.hash === ADMIN_HASH) {
                 history.replaceState(null, '', location.pathname + location.search);
             }
+            if (window.APP_KIND === 'admin') { location.href = 'index.html'; return; }
             showRoute('beranda', true);
         }
 
@@ -4058,12 +4059,12 @@ async function loadAudioPlaylistData() { audioPlaylistLoaded = true; }   // data
                 ];
                 content.innerHTML = `
                     <div class="max-w-6xl mx-auto py-8 space-y-6">
-                        <div class="flex flex-col sm:flex-row justify-between items-center bg-forest-800/90 p-6 rounded-2xl gold-border gap-4">
+                        <div class="flex flex-col sm:flex-row justify-between items-center bg-forest-800/90 p-4 sm:p-6 rounded-2xl gold-border gap-3">
                             <div>
                                 <h2 class="font-serif text-2xl md:text-3xl font-bold gold-text">Dasbor Admin Tersembunyi</h2>
                                 <p class="text-sm text-gray-300">Kelola member, generasi, dan seluruh konten situs.</p>
                             </div>
-                            <button onclick="handleAdminLogout()" class="px-5 py-2.5 rounded-xl bg-red-600 hover:bg-red-500 text-white font-medium transition shadow-lg">Keluar Admin</button>
+                            <button onclick="handleAdminLogout()" class="px-4 py-1.5 rounded-lg bg-red-600 hover:bg-red-500 text-white text-sm font-medium transition">Keluar Admin</button>
                         </div>
 
                         ${(window.loreviaDbStatus && !window.loreviaDbStatus.ok) ? `
@@ -4078,7 +4079,7 @@ async function loadAudioPlaylistData() { audioPlaylistLoaded = true; }   // data
                         <!-- Tab Navigation -->
                         <div class="flex flex-wrap gap-2 bg-forest-800/60 p-2 rounded-2xl border border-forest-700">
                             ${tabs.map(t => `
-                                <button onclick="switchAdminTab('${t.key}')" class="px-4 py-2.5 rounded-xl text-sm font-semibold transition ${adminTab === t.key ? 'bg-gold-600 text-black shadow-lg' : 'text-gray-300 hover:bg-forest-700'}">${t.label}</button>
+                                <button onclick="switchAdminTab('${t.key}')" class="px-3 py-1.5 rounded-lg text-xs font-semibold transition ${adminTab === t.key ? 'bg-gold-600 text-black shadow-lg' : 'text-gray-300 hover:bg-forest-700'}">${t.label}</button>
                             `).join('')}
                         </div>
 
@@ -4448,28 +4449,32 @@ function renderView() {
 /* ################ Mode aplikasi & unduh ################ */
 // Mode aplikasi: banner unduh (PWA), tombol suara, tab bar bawah & menu "launcher" saat dipasang sebagai aplikasi.
 (function () {
-    var APP_FILE = 'lorevia-app.html';
+    var ADMIN = window.APP_KIND === 'admin';
+    var APP_FILE = ADMIN ? 'lorevia-admin.html' : 'lorevia-app.html';
+    var DKEY = ADMIN ? 'lorevia_admin_dismiss' : 'lorevia_app_dismiss';
+    function modeClass() { return ADMIN ? 'admin-app' : 'app-mode'; }
     function standalone() {
         return (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches) || window.navigator.standalone === true;
     }
     var deferred = null;
     window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault(); deferred = e; showBanner(); });
-    window.addEventListener('appinstalled', function () { deferred = null; hideBanner(true); document.documentElement.classList.add('app-mode'); build(); });
+    window.addEventListener('appinstalled', function () { deferred = null; hideBanner(true); document.documentElement.classList.add(modeClass()); build(); });
 
     function isIOS() { return /iphone|ipad|ipod/i.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1); }
-    function dismissed() { try { return Date.now() < +localStorage.getItem('lorevia_app_dismiss'); } catch (e) { return false; } }
+    function dismissed() { try { return Date.now() < +localStorage.getItem(DKEY); } catch (e) { return false; } }
 
     function bannerHtml() {
         return '<div class="ib-card">' +
             '<img class="ib-logo" src="logo.png" alt="Logo Lorevia Entertainment">' +
-            '<div class="ib-text"><b>Lorevia Entertainment</b><span>Pasang aplikasinya, lebih cepat &amp; bisa dibuka tanpa browser.</span></div>' +
-            '<button class="ib-go" id="ibGo" aria-label="Unduh aplikasi"><svg class="ico" aria-hidden="true"><use href="#download"></use></svg><span>Unduh</span></button>' +
+            '<div class="ib-text"><b>' + (ADMIN ? 'Lorevia Admin' : 'Lorevia Entertainment') + '</b><span>' + (ADMIN ? 'Aplikasi khusus admin untuk mengelola konten.' : 'Pasang aplikasinya: lebih cepat &amp; dibuka tanpa browser.') + '</span></div>' +
+            '<button class="ib-go" id="ibGo" aria-label="Unduh aplikasi"><svg class="ico" aria-hidden="true"><use href="#download"></use></svg><span>Unduh Aplikasi</span></button>' +
             '<button class="ib-x" id="ibX" aria-label="Tutup">&times;</button></div>';
     }
     function showBanner() {
         if (standalone() || dismissed() || document.getElementById('installBanner')) return;
         var d = document.createElement('div');
         d.id = 'installBanner'; d.innerHTML = bannerHtml();
+        d.addEventListener('click', function (e) { if (e.target === d) hideBanner(false); });
         document.body.appendChild(d);
         requestAnimationFrame(function () { d.classList.add('show'); });
         document.getElementById('ibGo').onclick = installNow;
@@ -4478,7 +4483,7 @@ function renderView() {
     function hideBanner(done) {
         var d = document.getElementById('installBanner');
         if (d) { d.classList.remove('show'); setTimeout(function () { d.remove(); }, 400); }
-        if (!done) { try { localStorage.setItem('lorevia_app_dismiss', String(Date.now() + 3 * 86400000)); } catch (e) {} }
+        if (!done) { try { localStorage.setItem(DKEY, String(Date.now() + 3 * 86400000)); } catch (e) {} }
     }
     function installNow() {
         if (deferred) {
@@ -4487,7 +4492,7 @@ function renderView() {
             return;
         }
         // Tanpa dukungan pemasangan langsung (iOS / browser lain): unduh file pintasan otomatis + petunjuk.
-        var a = document.createElement('a'); a.href = APP_FILE; a.download = 'Lorevia-Entertainment.html';
+        var a = document.createElement('a'); a.href = APP_FILE; a.download = ADMIN ? 'Lorevia-Admin.html' : 'Lorevia-Entertainment.html';
         document.body.appendChild(a); a.click(); a.remove();
         var msg = isIOS()
             ? 'Di iPhone/iPad: buka situs ini di Safari, ketuk tombol Bagikan lalu pilih "Tambah ke Layar Utama".'
@@ -4507,14 +4512,6 @@ function renderView() {
         s.onclick = function () { window.toggleUiSound(); };
         if (window.uiSoundMuted && window.uiSoundMuted()) s.classList.add('is-muted');
         box.insertBefore(s, box.firstChild);
-        if (!standalone()) {
-            var d = document.createElement('button');
-            d.id = 'dlBtn'; d.setAttribute('aria-label', 'Unduh aplikasi');
-            d.className = 'p-2.5 rounded-full bg-forest-800 gold-border text-gold-400 hover:bg-forest-700 transition';
-            d.innerHTML = '<svg class="ico" aria-hidden="true"><use href="#download"></use></svg>';
-            d.onclick = installNow;
-            box.insertBefore(d, box.firstChild);
-        }
     }
 
     // ---- Tampilan aplikasi: tab bar bawah + menu launcher ----
@@ -4523,7 +4520,7 @@ function renderView() {
         ['struktur', 'butterfly', 'Struktur'], ['member', 'star', 'Members'], ['pengumuman', 'bullhorn', 'Pengumuman'], ['achievement', 'trophy', 'Achievement'],
         ['medpart', 'play-circle', 'Promote'], ['toko', 'shopping', 'Store'], ['dispatch', 'article', 'Dispatch'], ['guestbox', 'mailbox', 'Guest Box']];
     function build() {
-        if (!document.documentElement.classList.contains('app-mode') || document.getElementById('appTabs')) return;
+        if (ADMIN || !document.documentElement.classList.contains('app-mode') || document.getElementById('appTabs')) return;
         var bar = document.createElement('nav');
         bar.id = 'appTabs';
         bar.innerHTML = TABS.map(function (t) {
@@ -4548,13 +4545,13 @@ function renderView() {
     };
 
     function init() {
-        if (standalone()) document.documentElement.classList.add('app-mode');
+        if (standalone()) document.documentElement.classList.add(modeClass());
         headerButtons(); build();
         if ('serviceWorker' in navigator && location.protocol.indexOf('http') === 0) {
             navigator.serviceWorker.register('sw.js').catch(function () {});
         }
         // Beri banner juga di browser yang tidak mengirim beforeinstallprompt (mis. iOS)
-        setTimeout(function () { if (!deferred && isIOS()) showBanner(); }, 2500);
+        setTimeout(function () { if (!deferred) showBanner(); }, 2500);
     }
     if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init); else init();
 })();
