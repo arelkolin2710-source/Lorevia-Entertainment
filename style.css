@@ -743,7 +743,7 @@ html.app-mode #appTabs { position: fixed; left: 10px; right: 10px; bottom: calc(
 @keyframes amUp { from { transform: translateY(100%); } to { transform: none; } }
 
 /* ===== Header & tombol rapi di semua layar (tidak melebar keluar layar) ===== */
-html, body { overflow-x: hidden; max-width: 100%; }
+html, body { overflow-x: clip; max-width: 100%; }
 header.sticky { padding: 8px 12px !important; gap: 8px; min-width: 0; }
 header.sticky > div:first-child { min-width: 0; flex: 1 1 auto; gap: 8px; }
 header.sticky > div:first-child > div { width: 34px !important; height: 34px !important; flex-shrink: 0; }
@@ -755,7 +755,7 @@ header.sticky button svg { width: 18px !important; height: 18px !important; }
 header.sticky button:hover, header.sticky button:active { transform: none !important; }
 @media (max-width: 380px) { header.sticky .gold-text { font-size: .9rem !important; } }
 html.app-mode header.sticky .gold-text { font-size: 1rem !important; }
-#appContent { overflow-x: hidden; max-width: 100%; }
+#appContent { overflow-x: clip; max-width: 100%; }
 #appContent img, #appContent video, #appContent iframe { max-width: 100%; }
 #appContent button { max-width: 100%; }
 header.sticky { display: flex !important; align-items: center; justify-content: space-between; }

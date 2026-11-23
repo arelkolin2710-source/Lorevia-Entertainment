@@ -250,7 +250,7 @@
                 if (m.dob === undefined) m.dob = m.tanggalLahir || '';
                 if (m.faceClaim === undefined) m.faceClaim = '';
                 if (m.tiktok === undefined) m.tiktok = '';
-                if (!m.genId) {
+                if (!m.genId || !appData.generations.some(x => x.id === m.genId)) {
                     const gname = (m.status === 'group' && m.groupName) ? m.groupName : 'Gen 1';
                     let g = appData.generations.find(x => x.name === gname);
                     if (!g) { g = { id: 'gen_' + gname.toLowerCase().replace(/[^a-z0-9]+/g, '_'), name: gname }; appData.generations.push(g); }
@@ -2647,6 +2647,62 @@ async function saveMember(e) {
 }
 const deleteMember = i => adminDelete('members', i, 'member');
 
+// ---------------- Struktur Team (bagan kepengurusan) ----------------
+ADMIN_LISTS.structure = 'adminStructure';
+function structLevelForRole(role) {
+    const i = (typeof URUTAN_JABATAN_ADMIN !== 'undefined' ? URUTAN_JABATAN_ADMIN : []).findIndex(l => l.includes(role));
+    return i >= 0 ? i + 1 : 0;
+}
+function onStructRoleChange() {
+    const r = document.getElementById('sRole'), l = document.getElementById('sLevel');
+    const lv = structLevelForRole(r.value);
+    if (lv && l) l.value = String(lv);
+}
+function renderStructureTab() {
+    const e = adminEditing('structure');
+    const roles = (typeof URUTAN_JABATAN_ADMIN !== 'undefined' ? URUTAN_JABATAN_ADMIN : []).flat();
+    const curRole = e ? (e.role || '') : '';
+    const curLevel = e ? (parseInt(e.level, 10) || structLevelForRole(curRole) || 1) : 1;
+    const levelOpts = (typeof URUTAN_JABATAN_ADMIN !== 'undefined' ? URUTAN_JABATAN_ADMIN : [[]]).map((l, i) =>
+        `<option value="${i + 1}" ${curLevel === i + 1 ? 'selected' : ''}>Level ${i + 1} – ${escHtml(l.join(' / '))}</option>`).join('');
+    const rows = (appData.adminStructure || []).map((m, i) => ({ m, i }))
+        .sort((a, b) => (parseInt(a.m.level, 10) || 99) - (parseInt(b.m.level, 10) || 99))
+        .map(({ m, i }) => itemRow(m.img, m.name || '-', (m.role || '-') + ' · Level ' + (m.level || '?'), 'structure', i, 'deleteStructure')).join('');
+    return `<div class="space-y-6">
+        ${cardBox(`
+            ${formHead('structure', 'Struktur Team', e)}
+            <form id="form_structure" onsubmit="saveStructure(event)" class="space-y-3">
+                <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    <div><label class="${A_LBL}">Nama</label><input type="text" id="sName" required value="${escHtml(e ? e.name : '')}" class="${A_INP}"></div>
+                    <div><label class="${A_LBL}">Jabatan</label>
+                        <input type="text" id="sRole" list="sRoleList" required value="${escHtml(curRole)}" oninput="onStructRoleChange()" onchange="onStructRoleChange()" class="${A_INP}" placeholder="Pilih / ketik jabatan">
+                        <datalist id="sRoleList">${roles.map(r => `<option value="${escHtml(r)}">`).join('')}</datalist></div>
+                    <div><label class="${A_LBL}">Level di bagan</label><select id="sLevel" class="${A_INP}">${levelOpts}</select></div>
+                </div>
+                ${photoField('sPhoto', e && e.img)}
+                <button type="submit" class="${A_BTN}">${e ? 'Simpan Perubahan' : 'Tambah ke Struktur'}</button>
+            </form>
+            ${listBox(rows)}
+        `)}
+    </div>`;
+}
+async function saveStructure(e) {
+    e.preventDefault();
+    try {
+        const ed = adminEditing('structure');
+        const name = document.getElementById('sName').value.trim();
+        const role = document.getElementById('sRole').value.trim();
+        const level = parseInt(document.getElementById('sLevel').value, 10) || 1;
+        if (!name || !role) throw adminFail('Nama dan jabatan wajib diisi.');
+        const img = await adminPhoto('sPhoto', 'struktur');
+        if (ed) { Object.assign(ed, { name, role, level }); if (img) ed.img = img; }
+        else appData.adminStructure.push({ id: Date.now(), name, role, level, img: img || '' });
+        const wasEdit = !!ed; adminEdit = null;
+        await commitAdminChange(wasEdit ? 'Struktur Team berhasil diperbarui!' : 'Anggota ditambahkan ke Struktur Team!');
+    } catch (err) { adminActionFailed(err); }
+}
+const deleteStructure = i => adminDelete('structure', i, 'anggota struktur');
+
 
 /* ################ Media video/audio ################ */
 // Video & audio playlist: file diunggah dan disimpan langsung di database Firestore (tanpa Google Drive / Apps Script).
@@ -4051,6 +4107,7 @@ async function loadAudioPlaylistData() { audioPlaylistLoaded = true; }   // data
             if (currentRoute === 'admin-dashboard' && isAdminLoggedIn) {
                 const tabs = [
                     { key: 'members', label: '🌱 Generasi & Member' },
+                    { key: 'struktur', label: '🦋 Struktur Team' },
                     { key: 'announce', label: '📢 Pengumuman & Penghargaan' },
                     { key: 'history', label: '📜 History Lorevia' },
                     { key: 'coop', label: '🤝 Kerja Sama' },
@@ -4234,6 +4291,7 @@ async function loadAudioPlaylistData() { audioPlaylistLoaded = true; }   // data
                         ${adminTab === 'history' ? renderHistoryTab() : ''}
                         ${adminTab === 'coop' ? renderCoopTab() : ''}
                         ${adminTab === 'dispatch' ? renderDispatchTab() : ''}
+                        ${adminTab === 'struktur' ? renderStructureTab() : ''}
                         ${adminTab === 'medpart' ? renderMedpartTab() : ''}
 
                         ${adminTab === 'video' ? `

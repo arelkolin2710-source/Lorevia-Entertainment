@@ -1,196 +1,313 @@
 rules_version = '2';
+
+// =====================================================================
+// LOREVIA ENTERTAINMENT RVN 🌿 - ATURAN DATABASE (FIRESTORE)
+// Situs tidak memakai login, jadi baca/tulis terbuka, tetapi:
+//  - hanya koleksi yang terdaftar di bawah yang bisa dipakai,
+//  - setiap fitur punya fungsi pemeriksa sendiri (tipe & panjang data),
+//  - pemeriksaan hanya berlaku bila kolomnya ada (data lama tetap aman).
+// =====================================================================
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // =====================================================================
-    // FUNGSI BANTU
-    // Situs tidak memakai login, jadi semua orang boleh baca/tulis.
-    // Aturan di bawah membatasi KOLEKSI yang boleh dipakai dan memeriksa bentuk data dasar.
-    // Pemeriksaan hanya berlaku kalau kolomnya ada, supaya data lama tidak ditolak.
-    // =====================================================================
-    function small() {
-      return request.resource.data.keys().size() <= 80;
-    }
-    function text(f, max) {
-      return !(f in request.resource.data)
-          || (request.resource.data[f] is string && request.resource.data[f].size() <= max);
+    // ---------------------------------------------------------------
+    // ALAT BANTU UMUM
+    // ---------------------------------------------------------------
+    function body()  { return request.resource.data; }
+    function has(f)  { return f in body(); }
+    function small() { return body().keys().size() <= 80; }
+
+    function str(f, max) {
+      return !has(f) || (body()[f] is string && body()[f].size() <= max);
     }
     function num(f) {
-      return !(f in request.resource.data) || request.resource.data[f] is number;
+      return !has(f) || body()[f] is number;
     }
-    function ok(f1, m1) {
-      return small() && text(f1, m1);
+    function flag(f) {
+      return !has(f) || body()[f] is bool;
+    }
+    function arr(f, max) {
+      return !has(f) || (body()[f] is list && body()[f].size() <= max);
+    }
+    // gambar disimpan sebagai teks base64 (maks ~950 KB per dokumen)
+    function pic(f) {
+      return !has(f) || !(body()[f] is string) || body()[f].size() <= 950000;
+    }
+    function orderOk() { return num('_order'); }
+    function base()    { return small() && orderOk(); }
+
+    // ---------------------------------------------------------------
+    // PEMERIKSA PER FITUR
+    // ---------------------------------------------------------------
+    function okAnnouncement() {
+      return base() && str('title', 300) && str('content', 200000) && str('date', 60) && pic('img') && pic('image');
+    }
+    function okAchievement() {
+      return base() && str('title', 300) && str('desc', 200000) && str('year', 30) && pic('img');
+    }
+    function okHistory() {
+      return base() && str('title', 300) && str('date', 60) && str('story', 200000) && arr('contents', 40) && pic('img');
+    }
+    function okCooperation() {
+      return base() && str('title', 300) && str('partner', 300) && str('date', 60) && str('story', 200000) && arr('contents', 40) && pic('img');
+    }
+    function okDispatch() {
+      return base() && str('title', 300) && str('date', 60) && str('content', 200000) && pic('img');
+    }
+    function okMedpart() {
+      return base() && str('title', 300) && str('partner', 300) && str('date', 60) && str('desc', 200000) && pic('img');
+    }
+    function okStructure() {
+      return base() && str('name', 200) && str('role', 200) && pic('img');
+    }
+    function okGeneration() {
+      return base() && has('name') && str('name', 100) && body().name.size() > 0;
+    }
+    function okMember() {
+      return base() && str('name', 200) && str('stageName', 200) && str('dob', 30) && str('faceClaim', 200)
+          && str('tiktok', 300) && str('genId', 80) && pic('img');
+    }
+    function okGuest() {
+      return base() && str('name', 100) && str('message', 1000);
+    }
+    function okProduct() {
+      return base() && str('name', 300) && str('description', 5000) && num('price') && num('qty') && arr('images', 12);
+    }
+    function okPromo() {
+      return base() && str('code', 60) && str('type', 20) && num('value') && num('maxDiscount') && num('minPurchase');
+    }
+    function okOrder() {
+      return base() && str('status', 40) && num('total');
+    }
+    function okVideoPlaylist() {
+      return base() && str('name', 200) && str('desc', 2000) && pic('cover');
+    }
+    function okVideo() {
+      return base() && str('title', 300) && num('likes') && num('views') && num('commentCount') && pic('thumb');
+    }
+    function okAudioPlaylist() {
+      return base() && str('name', 200) && str('desc', 2000) && pic('cover');
+    }
+    function okAudio() {
+      return base() && str('title', 300) && str('artist', 200) && str('kind', 20)
+          && num('likes') && num('plays') && num('commentCount') && pic('cover');
+    }
+    function okChunk() {
+      return small() && body().d is string && body().d.size() <= 800000;
+    }
+    function okComment() {
+      return small()
+          && body().type in ['video', 'audio']
+          && body().itemId is string && body().itemId.size() <= 80
+          && body().name is string && body().name.size() > 0 && body().name.size() <= 60
+          && body().text is string && body().text.size() > 0 && body().text.size() <= 500;
     }
 
-    // =====================================================================
-    // PENGATURAN UMUM (cadangan; saat ini tidak dipakai)
-    // =====================================================================
-    match /settings/{id} {
-      allow read: if true;
-      allow create, update: if small();
-      allow delete: if false;
-    }
-
-    // =====================================================================
-    // FITUR: PENGUMUMAN (foto opsional + isi "baca selengkapnya")
-    // =====================================================================
+    // ---------------------------------------------------------------
+    // 1. PENGUMUMAN (foto opsional + isi "baca selengkapnya")
+    // ---------------------------------------------------------------
     match /announcements/{id} {
-      allow read: if true;
-      allow create, update: if ok('title', 300) && text('content', 200000) && text('date', 60);
+      allow get, list: if true;
+      allow create: if okAnnouncement();
+      allow update: if okAnnouncement();
       allow delete: if true;
     }
 
-    // =====================================================================
-    // FITUR: ACHIEVEMENT / PENGHARGAAN
-    // =====================================================================
+    // ---------------------------------------------------------------
+    // 2. ACHIEVEMENT / PENGHARGAAN
+    // ---------------------------------------------------------------
     match /achievements/{id} {
-      allow read: if true;
-      allow create, update: if ok('title', 300) && text('desc', 200000) && text('year', 30);
+      allow get, list: if true;
+      allow create: if okAchievement();
+      allow update: if okAchievement();
       allow delete: if true;
     }
 
-    // =====================================================================
-    // FITUR: HISTORY LOREVIA (foto, cerita latar belakang, beberapa isi, tanggal)
-    // =====================================================================
+    // ---------------------------------------------------------------
+    // 3. HISTORY AGENSI (khusus sejarah Lorevia)
+    // ---------------------------------------------------------------
     match /histories/{id} {
-      allow read: if true;
-      allow create, update: if ok('title', 300) && text('date', 60) && text('story', 200000);
+      allow get, list: if true;
+      allow create: if okHistory();
+      allow update: if okHistory();
       allow delete: if true;
     }
 
-    // =====================================================================
-    // FITUR: KERJA SAMA / COOPERATION (terpisah dari History & Medpart)
-    // =====================================================================
+    // ---------------------------------------------------------------
+    // 4. KERJA SAMA / COOPERATION (terpisah dari History)
+    // ---------------------------------------------------------------
     match /cooperations/{id} {
-      allow read: if true;
-      allow create, update: if ok('title', 300) && text('partner', 300) && text('date', 60) && text('story', 200000);
+      allow get, list: if true;
+      allow create: if okCooperation();
+      allow update: if okCooperation();
       allow delete: if true;
     }
 
-    // =====================================================================
-    // FITUR: DISPATCH / BERITA RESMI (foto + teks dengan link otomatis)
-    // =====================================================================
+    // ---------------------------------------------------------------
+    // 5. DISPATCH / BERITA RESMI
+    // ---------------------------------------------------------------
     match /dispatches/{id} {
-      allow read: if true;
-      allow create, update: if ok('title', 300) && text('date', 60) && text('content', 200000);
+      allow get, list: if true;
+      allow create: if okDispatch();
+      allow update: if okDispatch();
       allow delete: if true;
     }
 
-    // =====================================================================
-    // FITUR: OFFICIAL PROMOTE MEDPART (poster + video YouTube)
-    // =====================================================================
+    // ---------------------------------------------------------------
+    // 6. OFFICIAL PROMOTE / MEDPART
+    // ---------------------------------------------------------------
     match /medparts/{id} {
-      allow read: if true;
-      allow create, update: if ok('title', 300) && text('partner', 300) && text('date', 60) && text('desc', 200000);
+      allow get, list: if true;
+      allow create: if okMedpart();
+      allow update: if okMedpart();
       allow delete: if true;
     }
 
-    // =====================================================================
-    // FITUR: STRUKTUR ADMIN (bagan organisasi)
-    // =====================================================================
+    // ---------------------------------------------------------------
+    // 7. STRUKTUR TEAM (bagan organisasi)
+    // ---------------------------------------------------------------
     match /adminStructure/{id} {
-      allow read: if true;
-      allow create, update: if ok('name', 200) && text('role', 200);
+      allow get, list: if true;
+      allow create: if okStructure();
+      allow update: if okStructure();
       allow delete: if true;
     }
 
-    // =====================================================================
-    // FITUR: GENERASI (Gen 1, Gen 2, ... diatur dari dasbor admin)
-    // =====================================================================
+    // ---------------------------------------------------------------
+    // 8. GENERASI (Gen 1, Gen 2, ... diatur dari dasbor)
+    // ---------------------------------------------------------------
     match /generations/{id} {
-      allow read: if true;
-      allow create, update: if ok('name', 100);
+      allow get, list: if true;
+      allow create: if okGeneration();
+      allow update: if okGeneration();
       allow delete: if true;
     }
 
-    // =====================================================================
-    // FITUR: MEMBERS / ARTIS (nama, tanggal lahir, face claim, link TikTok, foto, generasi)
-    // =====================================================================
+    // ---------------------------------------------------------------
+    // 9. MEMBERS / ARTIS (nama, tanggal lahir, face claim, TikTok, foto)
+    // ---------------------------------------------------------------
     match /members/{id} {
-      allow read: if true;
-      allow create, update: if ok('name', 200) && text('dob', 30) && text('faceClaim', 200) && text('tiktok', 300) && text('genId', 80);
+      allow get, list: if true;
+      allow create: if okMember();
+      allow update: if okMember();
       allow delete: if true;
     }
 
-    // =====================================================================
-    // FITUR: GUEST BOX (pesan pengunjung)
-    // =====================================================================
+    // ---------------------------------------------------------------
+    // 10. GUEST BOX (pesan pengunjung)
+    // ---------------------------------------------------------------
     match /guestBoxes/{id} {
-      allow read: if true;
-      allow create, update: if ok('name', 100) && text('message', 1000);
+      allow get, list: if true;
+      allow create: if okGuest();
+      allow update: if okGuest();
       allow delete: if true;
     }
 
-    // =====================================================================
-    // FITUR: TOKO (produk + carousel foto, promo, pesanan)
-    // =====================================================================
+    // ---------------------------------------------------------------
+    // 11. TOKO: PRODUK
+    // ---------------------------------------------------------------
     match /products/{id} {
-      allow read: if true;
-      allow create, update: if ok('name', 300) && text('description', 5000) && num('price') && num('qty');
+      allow get, list: if true;
+      allow create: if okProduct();
+      allow update: if okProduct();
       allow delete: if true;
     }
+
+    // ---------------------------------------------------------------
+    // 12. TOKO: PROMO & VOUCHER
+    // ---------------------------------------------------------------
     match /promos/{id} {
-      allow read: if true;
-      allow create, update: if ok('code', 60);
+      allow get, list: if true;
+      allow create: if okPromo();
+      allow update: if okPromo();
       allow delete: if true;
     }
+
+    // ---------------------------------------------------------------
+    // 13. TOKO: PESANAN
+    // ---------------------------------------------------------------
     match /orders/{id} {
-      allow read: if true;
-      allow create, update: if small();
+      allow get, list: if true;
+      allow create: if okOrder();
+      allow update: if okOrder();
       allow delete: if true;
     }
 
-    // =====================================================================
-    // FITUR: VIDEO PLAYLIST
-    // =====================================================================
+    // ---------------------------------------------------------------
+    // 14. AKTIVITAS - VIDEO: PLAYLIST
+    // ---------------------------------------------------------------
     match /videoPlaylists/{id} {
-      allow read: if true;
-      allow create, update: if ok('name', 200) && text('desc', 2000);
+      allow get, list: if true;
+      allow create: if okVideoPlaylist();
+      allow update: if okVideoPlaylist();
       allow delete: if true;
     }
+
+    // ---------------------------------------------------------------
+    // 15. AKTIVITAS - VIDEO: ITEM VIDEO (suka, tonton, komentar)
+    // ---------------------------------------------------------------
     match /videos/{id} {
-      allow read: if true;
-      allow create, update: if ok('title', 300) && num('likes') && num('views') && num('commentCount');
+      allow get, list: if true;
+      allow create: if okVideo();
+      allow update: if okVideo();
       allow delete: if true;
     }
 
-    // =====================================================================
-    // FITUR: AUDIO PLAYLIST
-    // =====================================================================
+    // ---------------------------------------------------------------
+    // 16. AKTIVITAS - AUDIO: PLAYLIST
+    // ---------------------------------------------------------------
     match /audioPlaylists/{id} {
-      allow read: if true;
-      allow create, update: if ok('name', 200) && text('desc', 2000);
+      allow get, list: if true;
+      allow create: if okAudioPlaylist();
+      allow update: if okAudioPlaylist();
       allow delete: if true;
     }
+
+    // ---------------------------------------------------------------
+    // 17. AKTIVITAS - AUDIO: ITEM LAGU (judul, artis, cover/ORI, suka)
+    // ---------------------------------------------------------------
     match /audios/{id} {
-      allow read: if true;
-      allow create, update: if ok('title', 300) && text('artist', 200) && text('kind', 20) && num('likes') && num('plays') && num('commentCount');
+      allow get, list: if true;
+      allow create: if okAudio();
+      allow update: if okAudio();
       allow delete: if true;
     }
 
-    // =====================================================================
-    // FITUR: FILE VIDEO & AUDIO (dipecah per potongan ~525 KB)
-    // =====================================================================
+    // ---------------------------------------------------------------
+    // 18. FILE VIDEO & AUDIO (dipecah per potongan)
+    // ---------------------------------------------------------------
     match /mediaChunks/{id} {
-      allow read: if true;
-      allow create, update: if small() && request.resource.data.d is string && request.resource.data.d.size() <= 800000;
+      allow get, list: if true;
+      allow create: if okChunk();
+      allow update: if okChunk();
       allow delete: if true;
     }
 
-    // =====================================================================
-    // FITUR: KOMENTAR VIDEO & AUDIO (siapa pun boleh berkomentar; tidak bisa diedit)
-    // =====================================================================
+    // ---------------------------------------------------------------
+    // 19. KOMENTAR VIDEO & AUDIO (boleh dibuat & dihapus, tidak boleh diubah)
+    // ---------------------------------------------------------------
     match /comments/{id} {
-      allow read: if true;
-      allow create: if small()
-                    && request.resource.data.type in ['video', 'audio']
-                    && request.resource.data.itemId is string
-                    && request.resource.data.name is string && request.resource.data.name.size() > 0 && request.resource.data.name.size() <= 60
-                    && request.resource.data.text is string && request.resource.data.text.size() > 0 && request.resource.data.text.size() <= 500;
+      allow get, list: if true;
+      allow create: if okComment();
       allow update: if false;
       allow delete: if true;
     }
 
-    // Koleksi lain yang tidak terdaftar di atas otomatis ditolak.
+    // ---------------------------------------------------------------
+    // 20. PENGATURAN UMUM (cadangan, tidak boleh dihapus)
+    // ---------------------------------------------------------------
+    match /settings/{id} {
+      allow get, list: if true;
+      allow create: if small();
+      allow update: if small();
+      allow delete: if false;
+    }
+
+    // ---------------------------------------------------------------
+    // SELAIN YANG DI ATAS: DITOLAK
+    // ---------------------------------------------------------------
+    match /{document=**} {
+      allow read, write: if false;
+    }
   }
 }
