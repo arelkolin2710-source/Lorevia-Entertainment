@@ -71,7 +71,8 @@ service cloud.firestore {
       return base() && str('name', 100) && str('message', 1000);
     }
     function okProduct() {
-      return base() && str('name', 300) && str('description', 5000) && num('price') && num('qty') && arr('images', 12);
+      return base() && str('name', 300) && str('description', 5000) && num('price') && num('qty') && arr('images', 12)
+          && str('artistId', 80) && (!has('kind') || body().kind in ['album', 'merch']);
     }
     function okPromo() {
       return base() && str('code', 60) && str('type', 20) && num('value') && num('maxDiscount') && num('minPurchase');
@@ -101,6 +102,30 @@ service cloud.firestore {
           && body().itemId is string && body().itemId.size() <= 80
           && body().name is string && body().name.size() > 0 && body().name.size() <= 60
           && body().text is string && body().text.size() > 0 && body().text.size() <= 500;
+    }
+
+
+    // ---- Lorevia Verse ----
+    function okVerseGroup() {
+      return base() && has('name') && str('name', 100) && body().name.size() > 0 && str('bio', 500) && pic('photo') && pic('banner');
+    }
+    function okVerseArtist() {
+      return base() && has('name') && str('name', 100) && body().name.size() > 0 && str('groupId', 80) && str('bio', 500)
+          && str('loginName', 80) && str('code', 80) && pic('photo');
+    }
+    function okVersePost() {
+      return base() && str('text', 3000) && arr('photos', 10) && str('groupId', 80) && str('authorId', 80)
+          && (!has('authorType') || body().authorType in ['group', 'artist'])
+          && flag('exclusive')
+          && (!has('price') || (body().price is number && body().price >= 0 && body().price <= 10000))
+          && num('likes') && num('ts');
+    }
+    function okVerseStory() {
+      return base() && str('artistId', 80) && str('groupId', 80) && str('text', 300) && pic('photo') && num('ts');
+    }
+    function okVerseUnlock() {
+      return base() && str('postId', 80) && str('buyer', 100) && str('contact', 200) && str('code', 12)
+          && (!has('status') || body().status in ['pending', 'paid']) && num('ts');
     }
 
     // ---------------------------------------------------------------
@@ -294,7 +319,57 @@ service cloud.firestore {
     }
 
     // ---------------------------------------------------------------
-    // 20. PENGATURAN UMUM (cadangan, tidak boleh dihapus)
+    // 21. LOREVIA VERSE: AKUN GRUP
+    // ---------------------------------------------------------------
+    match /verseGroups/{id} {
+      allow get, list: if true;
+      allow create: if okVerseGroup();
+      allow update: if okVerseGroup();
+      allow delete: if true;
+    }
+
+    // ---------------------------------------------------------------
+    // 22. LOREVIA VERSE: AKUN ARTIS (nama akun + kode masuk)
+    // ---------------------------------------------------------------
+    match /verseArtists/{id} {
+      allow get, list: if true;
+      allow create: if okVerseArtist();
+      allow update: if okVerseArtist();
+      allow delete: if true;
+    }
+
+    // ---------------------------------------------------------------
+    // 23. LOREVIA VERSE: POSTINGAN (foto carousel maks 10, musik, eksklusif maks Rp10.000)
+    // ---------------------------------------------------------------
+    match /versePosts/{id} {
+      allow get, list: if true;
+      allow create: if okVersePost();
+      allow update: if okVersePost();
+      allow delete: if true;
+    }
+
+    // ---------------------------------------------------------------
+    // 24. LOREVIA VERSE: STORY ARTIS (24 jam)
+    // ---------------------------------------------------------------
+    match /verseStories/{id} {
+      allow get, list: if true;
+      allow create: if okVerseStory();
+      allow update: if okVerseStory();
+      allow delete: if true;
+    }
+
+    // ---------------------------------------------------------------
+    // 25. LOREVIA VERSE: PEMBAYARAN KONTEN EKSKLUSIF
+    // ---------------------------------------------------------------
+    match /verseUnlocks/{id} {
+      allow get, list: if true;
+      allow create: if okVerseUnlock();
+      allow update: if okVerseUnlock();
+      allow delete: if true;
+    }
+
+    // ---------------------------------------------------------------
+    // 26. PENGATURAN UMUM (cadangan, tidak boleh dihapus)
     // ---------------------------------------------------------------
     match /settings/{id} {
       allow get, list: if true;
