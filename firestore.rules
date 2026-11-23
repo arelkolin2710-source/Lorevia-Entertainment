@@ -72,7 +72,7 @@ service cloud.firestore {
     }
     function okProduct() {
       return base() && str('name', 300) && str('description', 5000) && num('price') && num('qty') && arr('images', 12)
-          && str('artistId', 80) && (!has('kind') || body().kind in ['album', 'merch']);
+          && str('artistId', 80) && str('groupId', 80) && (!has('kind') || body().kind in ['album', 'merch']);
     }
     function okPromo() {
       return base() && str('code', 60) && str('type', 20) && num('value') && num('maxDiscount') && num('minPurchase');
@@ -98,7 +98,7 @@ service cloud.firestore {
     }
     function okComment() {
       return small()
-          && body().type in ['video', 'audio']
+          && body().type in ['video', 'audio', 'versePost']
           && body().itemId is string && body().itemId.size() <= 80
           && body().name is string && body().name.size() > 0 && body().name.size() <= 60
           && body().text is string && body().text.size() > 0 && body().text.size() <= 500;
@@ -107,16 +107,22 @@ service cloud.firestore {
 
     // ---- Lorevia Verse ----
     function okVerseGroup() {
-      return base() && has('name') && str('name', 100) && body().name.size() > 0 && str('bio', 500) && pic('photo') && pic('banner');
+      return base() && has('name') && str('name', 100) && body().name.size() > 0 && str('bio', 500) && str('slug', 60) && str('loginName', 80) && pic('photo') && pic('banner');
     }
     function okVerseArtist() {
       return base() && has('name') && str('name', 100) && body().name.size() > 0 && str('groupId', 80) && str('bio', 500)
-          && str('loginName', 80) && str('code', 80) && pic('photo');
+          && str('loginName', 80) && pic('photo');
+    }
+    function okCred() {
+      return base() && has('salt') && has('hash') && str('salt', 64) && str('hash', 128) && str('kind', 10) && str('refId', 80) && str('groupId', 80);
+    }
+    function okFan() {
+      return base() && has('name') && has('salt') && has('hash') && str('name', 60) && str('salt', 64) && str('hash', 128) && num('ts');
     }
     function okVersePost() {
       return base() && str('text', 3000) && arr('photos', 10) && str('groupId', 80) && str('authorId', 80)
           && (!has('authorType') || body().authorType in ['group', 'artist'])
-          && flag('exclusive')
+          && flag('exclusive') && (!has('spotify') || body().spotify is map)
           && (!has('price') || (body().price is number && body().price >= 0 && body().price <= 10000))
           && num('likes') && num('ts');
     }
@@ -229,7 +235,7 @@ service cloud.firestore {
     }
 
     // ---------------------------------------------------------------
-    // 11. TOKO: PRODUK
+    // 11. TOKO: PRODUK (termasuk store grup Lorevia Verse, diisi admin)
     // ---------------------------------------------------------------
     match /products/{id} {
       allow get, list: if true;
@@ -309,7 +315,7 @@ service cloud.firestore {
     }
 
     // ---------------------------------------------------------------
-    // 19. KOMENTAR VIDEO & AUDIO (boleh dibuat & dihapus, tidak boleh diubah)
+    // 19. KOMENTAR VIDEO, AUDIO & POSTINGAN VERSE (boleh dibuat & dihapus, tidak boleh diubah)
     // ---------------------------------------------------------------
     match /comments/{id} {
       allow get, list: if true;
@@ -329,7 +335,7 @@ service cloud.firestore {
     }
 
     // ---------------------------------------------------------------
-    // 22. LOREVIA VERSE: AKUN ARTIS (nama akun + kode masuk)
+    // 22. LOREVIA VERSE: AKUN ARTIS (data profil; sandi ada di verseLogins)
     // ---------------------------------------------------------------
     match /verseArtists/{id} {
       allow get, list: if true;
@@ -339,7 +345,7 @@ service cloud.firestore {
     }
 
     // ---------------------------------------------------------------
-    // 23. LOREVIA VERSE: POSTINGAN (foto carousel maks 10, musik, eksklusif maks Rp10.000)
+    // 23. LOREVIA VERSE: POSTINGAN (foto carousel maks 10, link Spotify, eksklusif maks Rp10.000)
     // ---------------------------------------------------------------
     match /versePosts/{id} {
       allow get, list: if true;
@@ -369,7 +375,29 @@ service cloud.firestore {
     }
 
     // ---------------------------------------------------------------
-    // 26. PENGATURAN UMUM (cadangan, tidak boleh dihapus)
+    // 26. LOREVIA VERSE: LOGIN GRUP & ARTIS (sandi di-hash; daftar dilarang, hanya get per nama)
+    // ---------------------------------------------------------------
+    match /verseLogins/{id} {
+      allow get: if true;
+      allow list: if false;
+      allow create: if okCred();
+      allow update: if okCred();
+      allow delete: if true;
+    }
+
+    // ---------------------------------------------------------------
+    // 27. LOREVIA VERSE: AKUN PENGGUNA/PENONTON (daftar baru saja, tidak bisa diubah/dihapus)
+    // ---------------------------------------------------------------
+    match /verseFans/{id} {
+      allow get: if true;
+      allow list: if false;
+      allow create: if okFan();
+      allow update: if false;
+      allow delete: if false;
+    }
+
+    // ---------------------------------------------------------------
+    // 28. PENGATURAN UMUM (cadangan, tidak boleh dihapus)
     // ---------------------------------------------------------------
     match /settings/{id} {
       allow get, list: if true;

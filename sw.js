@@ -1,5 +1,5 @@
 // Service worker: cache cangkang aplikasi supaya terbuka cepat; data tetap diambil langsung dari Firestore.
-var V = 'lorevia-v1', SHELL = ['./', 'index.html', 'style.css', 'app.js', 'logo.png', 'manifest.webmanifest'];
+var V = 'lorevia-v3', SHELL = ['./', 'index.html', 'style.css', 'app.js', 'logo.png', 'manifest.webmanifest'];
 self.addEventListener('install', function (e) { e.waitUntil(caches.open(V).then(function (c) { return c.addAll(SHELL); }).then(function () { return self.skipWaiting(); })); });
 self.addEventListener('activate', function (e) { e.waitUntil(caches.keys().then(function (ks) { return Promise.all(ks.filter(function (k) { return k !== V; }).map(function (k) { return caches.delete(k); })); }).then(function () { return self.clients.claim(); })); });
 self.addEventListener('fetch', function (e) {

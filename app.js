@@ -4,7 +4,9 @@
 (function () {
     var ROUTES = ["beranda", "about", "member", "toko", "checkout", "pengumuman", "achievement", "history", "kerjasama", "dispatch", "verse", "medpart", "struktur", "guestbox", "aktivitas", "video-playlist", "audio-playlist", "admin-dashboard"];
     var p = new URLSearchParams(location.search).get('p');
-    window.PAGE_ROUTE = location.hash === '#loreviaadmin' ? 'admin-dashboard' : (ROUTES.indexOf(p) >= 0 ? p : 'beranda');
+    var m = location.pathname.match(/\/([a-z0-9]+)login\/?$/i);
+    window.VERSE_LOGIN_SLUG = m ? m[1].toLowerCase() : '';
+    window.PAGE_ROUTE = location.hash === '#loreviaadmin' ? 'admin-dashboard' : (window.VERSE_LOGIN_SLUG ? 'verse' : (ROUTES.indexOf(p) >= 0 ? p : 'beranda'));
 })();
 
 
@@ -614,6 +616,29 @@
         }
     };
 
+
+    // ---------- Akun masuk Lorevia Verse (nama + sandi). Dokumen diambil satu per satu lewat nama akun;
+    // koleksinya tidak bisa didaftar/dibaca sekaligus (lihat firestore.rules). Sandi hanya disimpan sebagai hash.
+    function loginKey(n) { return String(n || '').trim().toLowerCase().replace(/[^a-z0-9._-]+/g, '_').slice(0, 60); }
+    function makeLoginApi(coll) {
+        return {
+            key: loginKey,
+            async get(name) {
+                await window.loreviaMedia.ready();
+                const snap = await fs.getDoc(fs.doc(db, coll, loginKey(name)));
+                return snap.exists() ? snap.data() : null;
+            },
+            async set(name, data) {
+                await window.loreviaMedia.ready();
+                await fs.setDoc(fs.doc(db, coll, loginKey(name)), data);
+            },
+            async del(name) {
+                try { await window.loreviaMedia.ready(); await fs.deleteDoc(fs.doc(db, coll, loginKey(name))); } catch (e) { console.warn(e); }
+            }
+        };
+    }
+    window.loreviaLogins = makeLoginApi('verseLogins');   // artis & akun grup
+    window.loreviaFans = makeLoginApi('verseFans');       // akun pengguna (penonton)
 
     // ---------- Suka / putar / komentar (atomik, aman dipakai banyak pengunjung bersamaan) ----------
     window.loreviaBump = async function (coll, id, field, delta) {
@@ -2794,22 +2819,41 @@ function renderVGroupSec() {
                 <div><label class="${A_LBL}">Nama grup</label><input id="vgName" required value="${escHtml(e ? e.name : '')}" class="${A_INP}"></div>
                 <div><label class="${A_LBL}">Bio singkat</label><input id="vgBio" value="${escHtml(e ? e.bio || '' : '')}" class="${A_INP}"></div>
             </div>
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div><label class="${A_LBL}">Link login (nama link)</label><input id="vgSlug" required value="${escHtml(e ? e.slug || '' : '')}" class="${A_INP}" placeholder="mis. m∅xura"></div>
+                <div><label class="${A_LBL}">Nama akun grup</label><input id="vgLogin" required value="${escHtml(e ? e.loginName || '' : '')}" class="${A_INP}" placeholder="mis. moxurar.official"></div>
+                <div><label class="${A_LBL}">Sandi ${e ? '(kosongkan = tidak diubah)' : ''}</label><input id="vgPass" type="password" ${e ? '' : 'required'} minlength="6" class="${A_INP}" autocomplete="new-password"></div>
+            </div>
+            ${e ? `<p class="text-[11px] text-gold-400 break-all">Link login grup: ${escHtml(vsLoginLink(e))}</p>` : '<p class="text-[11px] text-gray-400">Link login otomatis: situs-kamu/<i>namalink</i>login (huruf kecil tanpa simbol, ∅ menjadi o).</p>'}
             ${photoField('vgPhoto', e && e.photo).replace('Foto', 'Foto profil (dipotong bulat 1:1)')}
             ${photoField('vgBanner', e && e.banner).replace('Foto', 'Banner (opsional)')}
             <button type="submit" class="${A_BTN}">${e ? 'Simpan Perubahan' : 'Tambah Grup'}</button>
         </form>
-        ${listBox((appData.verseGroups || []).map((g, i) => itemRow(g.photo, g.name, (appData.verseArtists || []).filter(a => a.groupId === g.id).length + ' artis', 'vgroup', i, 'deleteVGroup')).join(''))}`);
+        ${listBox((appData.verseGroups || []).map((g, i) => itemRow(g.photo, g.name, (appData.verseArtists || []).filter(a => a.groupId === g.id).length + ' artis · ' + vsLoginLink(g), 'vgroup', i, 'deleteVGroup')).join(''))}`);
 }
 async function saveVGroup(e) {
     e.preventDefault();
     try {
         const ed = adminEditing('vgroup');
         const name = document.getElementById('vgName').value.trim(), bio = document.getElementById('vgBio').value.trim();
+        const slug = vsSlug(document.getElementById('vgSlug').value), gLogin = document.getElementById('vgLogin').value.trim(), gPass = document.getElementById('vgPass').value;
+        if (!slug) throw adminFail('Nama link tidak valid.');
+        if ((appData.verseGroups || []).some(g => g !== ed && vsSlug(g.slug || g.name) === slug)) throw adminFail('Nama link sudah dipakai grup lain.');
+        const oldLogin = ed ? ed.loginName : '';
+        if (!ed && !gPass) throw adminFail('Isi sandi akun grup.');
+        if (ed && !gPass && oldLogin !== gLogin) throw adminFail('Nama akun diganti: isi sandi baru.');
         const pf = document.getElementById('vgPhoto').files[0];
         const photo = pf ? await openCropper(pf, { maxChars: 60000 }) : null;
         const banner = await adminPhoto('vgBanner', 'vgb');
-        if (ed) { Object.assign(ed, { name, bio }); if (photo) ed.photo = photo; if (banner) ed.banner = banner; }
-        else appData.verseGroups.push({ id: 'vg_' + Date.now().toString(36), name, bio, photo: photo || '', banner: banner || '' });
+        let gid;
+        if (ed) { gid = ed.id; Object.assign(ed, { name, bio, slug, loginName: gLogin }); if (photo) ed.photo = photo; if (banner) ed.banner = banner; }
+        else { gid = 'vg_' + Date.now().toString(36); appData.verseGroups.push({ id: gid, name, bio, slug, loginName: gLogin, photo: photo || '', banner: banner || '' }); }
+        if (gPass) {
+            const taken = await window.loreviaLogins.get(gLogin);
+            if (taken && !(taken.kind === 'group' && taken.refId === gid)) throw adminFail('Nama akun sudah dipakai akun lain.');
+            await window.loreviaLogins.set(gLogin, { kind: 'group', refId: gid, groupId: gid, ...(await vsMakeCred(gPass)) });
+            if (oldLogin && oldLogin !== gLogin) await window.loreviaLogins.del(oldLogin);
+        }
         const was = !!ed; adminEdit = null;
         await commitAdminChange(was ? 'Akun grup diperbarui!' : 'Akun grup ditambahkan!');
     } catch (err) { adminActionFailed(err); }
@@ -2817,6 +2861,8 @@ async function saveVGroup(e) {
 function deleteVGroup(i) {
     const g = appData.verseGroups[i]; if (!g) return;
     if ((appData.verseArtists || []).some(a => a.groupId === g.id)) { alert('Hapus dulu akun artis di grup ini.'); return; }
+    if (g.loginName) window.loreviaLogins.del(g.loginName).catch(() => {});
+    appData.products = appData.products.filter(p => p.groupId !== g.id);
     adminDelete('vgroup', i, 'akun grup');
 }
 
@@ -2834,10 +2880,10 @@ function renderVArtistSec() {
             </div>
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div><label class="${A_LBL}">Nama akun untuk masuk</label><input id="vaLogin" required value="${escHtml(e ? e.loginName || '' : '')}" class="${A_INP}" placeholder="mis. rara.official"></div>
-                <div><label class="${A_LBL}">Kode masuk</label><input id="vaCode" required value="${escHtml(e ? e.code || '' : '')}" class="${A_INP}" placeholder="mis. 482913"></div>
+                <div><label class="${A_LBL}">Sandi ${e ? '(kosongkan = tidak diubah)' : ''}</label><input id="vaCode" type="password" ${e ? '' : 'required'} minlength="6" class="${A_INP}" autocomplete="new-password"></div>
             </div>
             ${photoField('vaPhoto', e && e.photo).replace('Foto', 'Foto profil (dipotong bulat 1:1)')}
-            <p class="text-[11px] text-gray-400">Artis masuk di Lorevia Verse &rarr; tab Akun memakai nama akun + kode ini, lalu mengatur postingan, story, konten eksklusif, dan store-nya sendiri.</p>
+            <p class="text-[11px] text-gray-400">Artis masuk di Lorevia Verse &rarr; tab Akun memakai nama akun + sandi ini lewat link login grupnya, lalu mengatur postingan, story, konten eksklusif, dan store-nya sendiri.</p>
             <button type="submit" class="${A_BTN}">${e ? 'Simpan Perubahan' : 'Tambah Akun Artis'}</button>
         </form>
         ${listBox((appData.verseArtists || []).map((a, i) => itemRow(a.photo, a.name, ((groups.find(g => g.id === a.groupId) || {}).name || '-') + ' · akun: ' + (a.loginName || '-'), 'vartist', i, 'deleteVArtist')).join(''))}`);
@@ -2851,11 +2897,22 @@ async function saveVArtist(e) {
         if ((appData.verseArtists || []).some(a => a !== ed && String(a.loginName).toLowerCase() === login.toLowerCase())) throw adminFail('Nama akun sudah dipakai artis lain.');
         const pf = document.getElementById('vaPhoto').files[0];
         const photo = pf ? await openCropper(pf, { maxChars: 60000 }) : null;
-        const rec = { name: v('vaName'), groupId: document.getElementById('vaGroup').value, bio: v('vaBio'), loginName: login, code: v('vaCode') };
-        if (ed) { Object.assign(ed, rec); if (photo) ed.photo = photo; }
-        else appData.verseArtists.push({ id: 'va_' + Date.now().toString(36), ...rec, photo: photo || '' });
+        const pass = document.getElementById('vaCode').value, oldLogin = ed ? ed.loginName : '';
+        if (!ed && !pass) throw adminFail('Isi sandi artis.');
+        if (ed && !pass && oldLogin !== login) throw adminFail('Nama akun diganti: isi sandi baru.');
+        const rec = { name: v('vaName'), groupId: document.getElementById('vaGroup').value, bio: v('vaBio'), loginName: login };
+        const aid = ed ? ed.id : 'va_' + Date.now().toString(36);
+        if (pass) {
+            const taken = await window.loreviaLogins.get(login);
+            if (taken && !(taken.kind === 'artist' && taken.refId === aid)) throw adminFail('Nama akun sudah dipakai akun lain.');
+            await window.loreviaLogins.set(login, { kind: 'artist', refId: aid, groupId: rec.groupId, ...(await vsMakeCred(pass)) });
+            if (oldLogin && oldLogin !== login) await window.loreviaLogins.del(oldLogin);
+        }
+        delete rec.code;
+        if (ed) { Object.assign(ed, rec); delete ed.code; if (photo) ed.photo = photo; }
+        else appData.verseArtists.push({ id: aid, ...rec, photo: photo || '' });
         const was = !!ed; adminEdit = null;
-        await commitAdminChange(was ? 'Akun artis diperbarui!' : 'Akun artis dibuat! Berikan nama akun & kode ke artis.');
+        await commitAdminChange(was ? 'Akun artis diperbarui!' : 'Akun artis dibuat! Berikan nama akun, sandi & link login grup ke artis.');
     } catch (err) { adminActionFailed(err); }
 }
 function deleteVArtist(i) {
@@ -2863,7 +2920,7 @@ function deleteVArtist(i) {
     if (!confirm('Hapus akun artis ini beserta postingan, story, dan produknya?')) return;
     appData.versePosts = appData.versePosts.filter(p => !(p.authorType === 'artist' && p.authorId === a.id));
     appData.verseStories = appData.verseStories.filter(s => s.artistId !== a.id);
-    appData.products = appData.products.filter(p => p.artistId !== a.id);
+    if (a.loginName) window.loreviaLogins.del(a.loginName).catch(() => {});
     appData.verseArtists.splice(i, 1);
     commitAdminChange('Akun artis dihapus.');
 }
@@ -2882,16 +2939,18 @@ function renderVPostSec() {
         ${listBox(posts.map(p => { const au = p.authorType === 'artist' ? vsArtist(p.authorId) : vsGroup(p.authorId); return itemRow((p.photos || [])[0], (p.text || '(tanpa teks)').slice(0, 60), (au ? au.name : '-') + ' · ' + vsAgo(p.ts) + (p.exclusive ? ' · eksklusif ' + vsRp(p.price) : ''), 'vpost', 0, 'void').replace(/<button onclick="startAdminEdit[^>]*>Edit<\/button>/, '').replace(/onclick="void\(0\)"/, `onclick="vsDeletePost('${p.id}')"`); }).join(''))}`);
 }
 
-// ---- Store artis ----
+// ---- Store grup (hanya admin) ----
 function renderVStoreSec() {
-    const arts = appData.verseArtists || [];
-    if (!arts.length) return cardBox('<p class="text-sm text-gray-300">Buat akun artis dulu.</p>');
-    const prods = (appData.products || []).filter(p => p.artistId);
+    const groups = appData.verseGroups || [];
+    if (!groups.length) return cardBox('<p class="text-sm text-gray-300">Buat akun grup dulu.</p>');
+    if (!groups.some(g => g.id === verseAdminGroup)) verseAdminGroup = groups[0].id;
+    const prods = vsGroupProducts(verseAdminGroup);
     return cardBox(`
-        <h4 class="font-serif text-lg font-bold text-gold-400">Store artis (album &amp; merchandise)</h4>
-        <div><label class="${A_LBL}">Untuk akun artis</label><select id="vaArtistSel" class="${A_INP}">${arts.map(a => `<option value="${escHtml(a.id)}">${escHtml(a.name)}</option>`).join('')}</select></div>
-        <div class="vs-admin">${vsProductFormHtml('__SEL__', 'vpa').replace("'__SEL__'", "document.getElementById('vaArtistSel').value")}</div>
-        ${listBox(prods.map(p => itemRow((p.images || [])[0], p.name, ((vsArtist(p.artistId) || {}).name || '-') + ' · ' + vsRp(p.price) + ' · stok ' + (p.qty || 0), 'vprod', 0, 'void').replace(/<button onclick="startAdminEdit[^>]*>Edit<\/button>/, '').replace(/onclick="void\(0\)"/, `onclick="vsDeleteProduct(${p.id})"`)).join(''))}`);
+        <h4 class="font-serif text-lg font-bold text-gold-400">Store grup (album &amp; merchandise)</h4>
+        <p class="text-[11px] text-gray-400">Hanya admin yang menambah produk. Produk tampil di tab Store Lorevia Verse milik grup yang dipilih.</p>
+        <div><label class="${A_LBL}">Untuk grup</label><select class="${A_INP}" onchange="verseAdminGroup = this.value; renderView()">${groups.map(g => `<option value="${escHtml(g.id)}" ${g.id === verseAdminGroup ? 'selected' : ''}>${escHtml(g.name)}</option>`).join('')}</select></div>
+        <div class="vs-admin">${vsProductFormHtml("'" + verseAdminGroup + "'", 'vpa').replace(/vsAddProduct\(([^,]*), 'vpa'\)/, "vsAddProduct($1, 'vpa')")}</div>
+        ${listBox(prods.map(p => itemRow((p.images || [])[0], p.name, vsRp(p.price) + ' · stok ' + (p.qty || 0) + ' · ' + (p.kind === 'album' ? 'album' : 'merch'), 'vprod', 0, 'void').replace(/<button onclick="startAdminEdit[^>]*>Edit<\/button>/, '').replace(/onclick="void\(0\)"/, `onclick="vsDeleteProduct(${p.id})"`)).join(''))}`);
 }
 
 // ---- Pembayaran konten eksklusif ----
@@ -3650,7 +3709,7 @@ function renderView_member() {
                         ` : `
                         <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
                             ${appData.products.map((p, idx) => {
-                                if (p.artistId) return '';   // produk Lorevia Verse tampil di akun artis
+                                if (p.artistId || p.groupId) return '';   // produk Lorevia Verse tampil di akun artis
                                 const imgs = (p.images && p.images.length > 0) ? p.images : [''];
                                 const activeIdx = productActiveImg[idx] || 0;
                                 const stock = parseInt(p.qty, 10) || 0;
@@ -3981,8 +4040,8 @@ function renderView_dispatch() {
 // ======== Halaman: verse ========
 // Lorevia Verse (route: verse): komunitas grup & artis Lorevia. Akun grup, akun artis, story, postingan (foto carousel 1:1, musik),
 // konten eksklusif berbayar (maks Rp10.000) dan store album/merchandise di tiap akun artis. Tanpa fitur live.
-const VS = { tab: 'home', groupId: null, artistId: null, sub: 'posts' };
-const VSC = { text: '', photos: [], audioTitle: '', exclusive: false, price: 5000, busy: '' };   // status penulis postingan
+const VS = { tab: 'home', groupId: null, artistId: null, sub: 'posts', loginSlug: (window.VERSE_LOGIN_SLUG || ''), gate: 'login' };
+const VSC = { text: '', photos: [], spotify: '', exclusive: false, price: 5000, busy: '' };   // status penulis postingan
 const VS_MAX_PHOTOS = 10, VS_MAX_PRICE = 10000, VS_MIN_PRICE = 1000;
 
 const VS_ICON = {
@@ -4000,7 +4059,66 @@ const VS_ICON = {
 
 function vsGroup(id) { return (appData.verseGroups || []).find(g => g.id === id) || null; }
 function vsArtist(id) { return (appData.verseArtists || []).find(a => a.id === id) || null; }
-function vsSession() { try { const id = sessionStorage.getItem('lorevia_verse_artist'); return id ? vsArtist(id) : null; } catch (e) { return null; } }
+function vsStaff() { try { return JSON.parse(localStorage.getItem('lorevia_verse_staff') || 'null'); } catch (e) { return null; } }
+function vsSession() { const st = vsStaff(); return st && st.kind === 'artist' ? vsArtist(st.id) : null; }          // akun artis yang masuk
+function vsGroupSession() { const st = vsStaff(); return st && st.kind === 'group' ? vsGroup(st.id) : null; }       // akun grup yang masuk
+function vsFan() { try { return localStorage.getItem('lorevia_verse_fan') || ''; } catch (e) { return ''; } }        // nama akun pengguna (penonton)
+function vsIsAdmin() { return typeof isAdminLoggedIn !== 'undefined' && isAdminLoggedIn; }
+function vsCanView() { return !!(vsFan() || vsStaff() || vsIsAdmin()); }
+function vsSlug(t) { return String(t || '').replace(/[\u2205\u00d8\u00f8]/g, 'o').normalize('NFKD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9]/g, ''); }
+function vsLoginLink(g) { return location.origin + '/' + vsSlug(g.slug || g.name) + 'login'; }
+// SHA-256 / PBKDF2 murni JavaScript: cadangan untuk WebView/APK yang tidak punya crypto.subtle (hasil hash sama persis).
+function vsSha256(bytes) {
+    const K = new Uint32Array([0x428a2f98,0x71374491,0xb5c0fbcf,0xe9b5dba5,0x3956c25b,0x59f111f1,0x923f82a4,0xab1c5ed5,0xd807aa98,0x12835b01,0x243185be,0x550c7dc3,0x72be5d74,0x80deb1fe,0x9bdc06a7,0xc19bf174,0xe49b69c1,0xefbe4786,0x0fc19dc6,0x240ca1cc,0x2de92c6f,0x4a7484aa,0x5cb0a9dc,0x76f988da,0x983e5152,0xa831c66d,0xb00327c8,0xbf597fc7,0xc6e00bf3,0xd5a79147,0x06ca6351,0x14292967,0x27b70a85,0x2e1b2138,0x4d2c6dfc,0x53380d13,0x650a7354,0x766a0abb,0x81c2c92e,0x92722c85,0xa2bfe8a1,0xa81a664b,0xc24b8b70,0xc76c51a3,0xd192e819,0xd6990624,0xf40e3585,0x106aa070,0x19a4c116,0x1e376c08,0x2748774c,0x34b0bcb5,0x391c0cb3,0x4ed8aa4a,0x5b9cca4f,0x682e6ff3,0x748f82ee,0x78a5636f,0x84c87814,0x8cc70208,0x90befffa,0xa4506ceb,0xbef9a3f7,0xc67178f2]);
+    const H = new Uint32Array([0x6a09e667,0xbb67ae85,0x3c6ef372,0xa54ff53a,0x510e527f,0x9b05688c,0x1f83d9ab,0x5be0cd19]);
+    const n = bytes.length, total = ((n + 9 + 63) >> 6) << 6, m = new Uint8Array(total);
+    m.set(bytes); m[n] = 0x80;
+    const dv = new DataView(m.buffer); dv.setUint32(total - 8, Math.floor(n / 0x20000000)); dv.setUint32(total - 4, (n << 3) >>> 0);
+    const w = new Uint32Array(64), rr = (x, c) => (x >>> c) | (x << (32 - c));
+    for (let off = 0; off < total; off += 64) {
+        for (let i = 0; i < 16; i++) w[i] = dv.getUint32(off + i * 4);
+        for (let i = 16; i < 64; i++) { const a = w[i - 15], b = w[i - 2]; w[i] = (w[i - 16] + (rr(a, 7) ^ rr(a, 18) ^ (a >>> 3)) + w[i - 7] + (rr(b, 17) ^ rr(b, 19) ^ (b >>> 10))) >>> 0; }
+        let [a, b, c, d, e, f, g, h] = H;
+        for (let i = 0; i < 64; i++) {
+            const t1 = (h + (rr(e, 6) ^ rr(e, 11) ^ rr(e, 25)) + ((e & f) ^ (~e & g)) + K[i] + w[i]) >>> 0;
+            const t2 = ((rr(a, 2) ^ rr(a, 13) ^ rr(a, 22)) + ((a & b) ^ (a & c) ^ (b & c))) >>> 0;
+            h = g; g = f; f = e; e = (d + t1) >>> 0; d = c; c = b; b = a; a = (t1 + t2) >>> 0;
+        }
+        H[0] += a; H[1] += b; H[2] += c; H[3] += d; H[4] += e; H[5] += f; H[6] += g; H[7] += h;
+    }
+    const out = new Uint8Array(32), o = new DataView(out.buffer); for (let i = 0; i < 8; i++) o.setUint32(i * 4, H[i]); return out;
+}
+function vsHmac(key, msg) {
+    if (key.length > 64) key = vsSha256(key);
+    const ip = new Uint8Array(64 + msg.length), op = new Uint8Array(96);
+    for (let i = 0; i < 64; i++) { const k = i < key.length ? key[i] : 0; ip[i] = k ^ 0x36; op[i] = k ^ 0x5c; }
+    ip.set(msg, 64); op.set(vsSha256(ip), 64); return vsSha256(op);
+}
+function vsPbkdf2Js(pass, salt, iters) {
+    const enc = new TextEncoder(), pw = enc.encode(pass), sb = enc.encode(salt);
+    const first = new Uint8Array(sb.length + 4); first.set(sb); first[sb.length + 3] = 1;
+    let u = vsHmac(pw, first); const t = Uint8Array.from(u);
+    for (let i = 1; i < iters; i++) { u = vsHmac(pw, u); for (let j = 0; j < 32; j++) t[j] ^= u[j]; }
+    return t;
+}
+async function vsHash(pass, salt) {
+    let bits;
+    if (window.crypto && crypto.subtle) {
+        try {
+            const enc = new TextEncoder();
+            const key = await crypto.subtle.importKey('raw', enc.encode(pass), 'PBKDF2', false, ['deriveBits']);
+            bits = new Uint8Array(await crypto.subtle.deriveBits({ name: 'PBKDF2', salt: enc.encode(salt), iterations: 100000, hash: 'SHA-256' }, key, 256));
+        } catch (e) { bits = null; }
+    }
+    if (!bits) bits = vsPbkdf2Js(pass, salt, 100000);
+    return [...bits].map(b => b.toString(16).padStart(2, '0')).join('');
+}
+async function vsMakeCred(pass) {
+    const rnd = new Uint8Array(12); if (window.crypto && crypto.getRandomValues) crypto.getRandomValues(rnd); else for (let i = 0; i < 12; i++) rnd[i] = Math.floor(Math.random() * 256);
+    const salt = [...rnd].map(b => b.toString(16).padStart(2, '0')).join('');
+    return { salt, hash: await vsHash(pass, salt) };
+}
+async function vsCheckCred(rec, pass) { return !!(rec && rec.salt && rec.hash && (await vsHash(pass, rec.salt)) === rec.hash); }
 function vsUnlockedList() { try { return JSON.parse(localStorage.getItem('lorevia_vs_unlocked') || '[]') || []; } catch (e) { return []; } }
 function vsRp(n) { return 'Rp' + (parseInt(n, 10) || 0).toLocaleString('id-ID'); }
 function vsAgo(ts) {
@@ -4018,8 +4136,19 @@ function vsStoriesOf(artistId) {
     const cut = Date.now() - 86400000;
     return (appData.verseStories || []).filter(s => s.artistId === artistId && (s.ts || 0) > cut).sort((a, b) => a.ts - b.ts);
 }
-function vsIsOwner(p) { const me = vsSession(); return !!(me && p.authorType === 'artist' && p.authorId === me.id) || (typeof isAdminLoggedIn !== 'undefined' && isAdminLoggedIn); }
+function vsIsOwner(p) { const me = vsSession(), gs = vsGroupSession(); return !!(me && p.authorType === 'artist' && p.authorId === me.id) || !!(gs && p.authorType === 'group' && p.authorId === gs.id) || vsIsAdmin(); }
 function vsLocked(p) { return !!p.exclusive && !vsIsOwner(p) && vsUnlockedList().indexOf(p.id) < 0; }
+
+// ---------- Spotify ----------
+function vsSpotify(url) {
+    const m = String(url || '').trim().match(/open\.spotify\.com\/(?:intl-[a-z]+\/)?(track|album|playlist|episode|show|artist)\/([A-Za-z0-9]+)/);
+    return m ? { type: m[1], id: m[2], url: 'https://open.spotify.com/' + m[1] + '/' + m[2] } : null;
+}
+function vsSpotifyHtml(sp) {
+    const h = (sp.type === 'track' || sp.type === 'episode') ? 152 : 352;
+    return `<div class="vs-sp"><iframe src="https://open.spotify.com/embed/${sp.type}/${escHtml(sp.id)}" height="${h}" loading="lazy" allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture" frameborder="0" title="Spotify"></iframe>
+        <a class="vs-link" href="${escHtml(sp.url)}" target="_blank" rel="noopener">Buka di Spotify</a></div>`;
+}
 
 // ---------- Kartu postingan ----------
 function vsPostHtml(p) {
@@ -4035,6 +4164,7 @@ function vsPostHtml(p) {
     } else {
         if (photos.length) media += `<div class="vs-car" onscroll="vsCarScroll(this)">${photos.map(src => `<div class="vs-slide"><img src="${escHtml(src)}" alt="" loading="lazy"></div>`).join('')}</div>` +
             (photos.length > 1 ? `<div class="vs-dots">${photos.map((_, i) => `<i class="${i === 0 ? 'on' : ''}"></i>`).join('')}</div>` : '');
+        if (p.spotify) media += vsSpotifyHtml(p.spotify);
         if (p.audio) media += `<button type="button" class="vs-audio" onclick="vsPlayPost('${p.id}')"><span>${VS_ICON.play}</span><em>${escHtml(p.audio.title || 'Musik')}</em>${VS_ICON.note}</button>`;
     }
     const owner = vsIsOwner(p) && !(typeof isAdminLoggedIn !== 'undefined' && isAdminLoggedIn && !vsSession() && false);
@@ -4043,9 +4173,27 @@ function vsPostHtml(p) {
         ${locked ? '' : (p.text ? `<p class="vs-text">${escHtml(p.text)}</p>` : '')}
         ${media}
         <footer><button type="button" class="vs-like ${p._liked ? 'on' : ''}" onclick="vsLike('${p.id}')">${p._liked ? VS_ICON.heart : VS_ICON.heartO}<span id="vsl_${p.id}">${(p.likes || 0).toLocaleString('id-ID')}</span></button>
+        <button type="button" class="vs-like" onclick="vsComments('${p.id}')">${VS_ICON.note}<span>Komentar</span></button>
         ${owner ? `<span class="vs-own"><button type="button" onclick="vsToggleExclusive('${p.id}')">${p.exclusive ? 'Jadikan publik' : 'Jadikan eksklusif'}</button><button type="button" onclick="vsDeletePost('${p.id}')">Hapus</button></span>` : ''}</footer>
-    </article>`;
+    <div class="vs-cm" id="vcm_${p.id}" hidden></div></article>`;
 }
+function vsMyName() { const st = vsStaff(); if (st) { const o = st.kind === 'artist' ? vsArtist(st.id) : vsGroup(st.id); return o ? o.name : 'Lorevia'; } return vsFan() || (vsIsAdmin() ? 'Admin Lorevia' : ''); }
+async function vsComments(id) {
+    const box = document.getElementById('vcm_' + id); if (!box) return;
+    if (!box.hidden) { box.hidden = true; return; }
+    box.hidden = false; box.innerHTML = '<small class="vs-mut">Memuat komentar...</small>';
+    try {
+        const rows = await window.loreviaComments.list(id);
+        box.innerHTML = (rows.length ? rows.map(c => `<div class="vs-c"><b>${escHtml(c.name)}</b> ${escHtml(c.text)}${(vsIsAdmin() || c.name === vsMyName()) ? ` <button type="button" class="vs-link" onclick="vsDelComment('${id}','${c._id}')">hapus</button>` : ''}</div>`).join('') : '<small class="vs-mut">Belum ada komentar.</small>')
+            + `<div class="vs-cform"><input id="vci_${id}" maxlength="500" placeholder="Tulis komentar..."><button type="button" class="vs-btn sm" onclick="vsSendComment('${id}')">Kirim</button></div>`;
+    } catch (e) { box.innerHTML = '<small class="vs-mut">Komentar gagal dimuat.</small>'; }
+}
+async function vsSendComment(id) {
+    const inp = document.getElementById('vci_' + id); const text = inp ? inp.value.trim() : ''; if (!text) return;
+    try { await window.loreviaComments.add({ type: 'versePost', itemId: String(id), name: vsMyName() || 'Penggemar', text: text.slice(0, 500), ts: Date.now() }); const b = document.getElementById('vcm_' + id); b.hidden = true; vsComments(id); }
+    catch (e) { alert('Komentar gagal dikirim.'); }
+}
+async function vsDelComment(pid, cid) { try { await window.loreviaComments.del(cid); const b = document.getElementById('vcm_' + pid); b.hidden = true; vsComments(pid); } catch (e) {} }
 function vsCarScroll(el) {
     const i = Math.round(el.scrollLeft / Math.max(1, el.clientWidth));
     const dots = el.nextElementSibling;
@@ -4148,8 +4296,7 @@ function vsComposerHtml(authorType, authorId, groupId) {
         <div class="vc-photos">${VSC.photos.map((p, i) => `<div class="vc-ph"><img src="${p.data}" alt=""><button type="button" onclick="vcRecrop(${i})" title="Atur potongan">&#9986;</button><button type="button" class="x" onclick="vcRemove(${i})">&times;</button></div>`).join('')}
             ${VSC.photos.length < VS_MAX_PHOTOS ? `<label class="vc-add">+<input type="file" accept="image/*" multiple hidden onchange="vcPick(this)"></label>` : ''}</div>
         <small class="vs-mut">${VSC.photos.length}/${VS_MAX_PHOTOS} foto · rasio 1:1, potongan bisa diatur</small>
-        <label class="vc-row"><span>Musik (opsional, maks ${MAX_AUDIO_MB} MB)</span><input type="file" id="vcAudio" accept="audio/*"></label>
-        <input id="vcAudioTitle" placeholder="Judul musik" value="${escHtml(VSC.audioTitle)}" oninput="VSC.audioTitle = this.value">
+        <input id="vcSpotify" placeholder="Link Spotify (opsional) mis. https://open.spotify.com/track/..." value="${escHtml(VSC.spotify)}" oninput="VSC.spotify = this.value">
         <label class="vc-check"><input type="checkbox" ${VSC.exclusive ? 'checked' : ''} onchange="VSC.exclusive = this.checked; vcKeep()"> Konten eksklusif (berbayar)</label>
         ${VSC.exclusive ? `<label class="vc-row"><span>Harga (maks Rp10.000)</span><select onchange="VSC.price = parseInt(this.value, 10)">${prices.map(v => `<option value="${v}" ${VSC.price === v ? 'selected' : ''}>${vsRp(v)}</option>`).join('')}</select></label>` : ''}
         <button type="button" class="vs-btn" onclick="vcSubmit('${authorType}', '${authorId}', '${groupId || ''}')" ${VSC.busy ? 'disabled' : ''}>${VSC.busy || 'Terbitkan'}</button></div>`;
@@ -4169,25 +4316,20 @@ function vcRemove(i) { VSC.photos.splice(i, 1); renderView(); }
 async function vcSubmit(authorType, authorId, groupId) {
     try {
         const text = (document.getElementById('vcText') ? document.getElementById('vcText').value : VSC.text).trim();
-        const audioFile = document.getElementById('vcAudio') && document.getElementById('vcAudio').files[0];
-        if (!text && !VSC.photos.length && !audioFile) { alert('Isi postingan dulu: teks, foto, atau musik.'); return; }
+        const spRaw = (document.getElementById('vcSpotify') ? document.getElementById('vcSpotify').value : VSC.spotify).trim();
+        const spotify = spRaw ? vsSpotify(spRaw) : null;
+        if (spRaw && !spotify) { alert('Link Spotify tidak dikenali. Salin link lengkap dari Spotify (open.spotify.com/track/...).'); return; }
+        if (!text && !VSC.photos.length && !spotify) { alert('Isi postingan dulu: teks, foto, atau link Spotify.'); return; }
         if (VSC.exclusive && !(VSC.price >= VS_MIN_PRICE && VSC.price <= VS_MAX_PRICE)) { alert('Harga eksklusif harus Rp1.000 - Rp10.000.'); return; }
-        let audio = null;
-        if (audioFile) {
-            if (!/^audio\//.test(audioFile.type || '')) { alert('File musik harus berupa audio.'); return; }
-            const btn = document.querySelector('.vs-composer .vs-btn');
-            const up = await uploadMediaFile(audioFile, 'audio', s => { if (btn) btn.textContent = s; });
-            audio = { data: 'fs:' + up.mid, chunks: up.chunks, fileType: audioFile.type, title: (document.getElementById('vcAudioTitle').value || audioFile.name).trim() };
-        }
         appData.versePosts.unshift({ id: 'vp_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5), authorType, authorId, groupId: groupId || '', text,
-            photos: VSC.photos.map(p => p.data), audio, exclusive: !!VSC.exclusive, price: VSC.exclusive ? VSC.price : 0, ts: Date.now(), likes: 0 });
-        VSC.text = ''; VSC.photos = []; VSC.audioTitle = ''; VSC.exclusive = false;
+            photos: VSC.photos.map(p => p.data), spotify, exclusive: !!VSC.exclusive, price: VSC.exclusive ? VSC.price : 0, ts: Date.now(), likes: 0 });
+        VSC.text = ''; VSC.photos = []; VSC.spotify = ''; VSC.exclusive = false;
         await commitAdminChange('Postingan terbit!');
     } catch (err) { adminActionFailed(err); }
 }
 
 // ---------- Produk (album & merchandise) ----------
-async function vsAddProduct(artistId, prefix) {
+async function vsAddProduct(groupId, prefix) {
     prefix = prefix || 'vp';
     try {
         const g = id => document.getElementById(prefix + '_' + id);
@@ -4196,8 +4338,8 @@ async function vsAddProduct(artistId, prefix) {
         if (!name || price <= 0) { alert('Nama dan harga produk wajib diisi.'); return; }
         const images = [];
         for (const f of files) { const d = await openCropper(f); if (d) images.push(d); }
-        appData.products.push({ id: Date.now(), name, description, price, qty, images, artistId, kind });
-        await commitAdminChange('Produk ditambahkan ke store artis!');
+        appData.products.push({ id: Date.now(), name, description, price, qty, images, groupId, kind });
+        await commitAdminChange('Produk ditambahkan ke store grup!');
     } catch (err) { adminActionFailed(err); }
 }
 async function vsDeleteProduct(id) {
@@ -4205,12 +4347,12 @@ async function vsDeleteProduct(id) {
     const i = appData.products.findIndex(p => p.id === id); if (i < 0) return;
     appData.products.splice(i, 1); await commitAdminChange('Produk dihapus.');
 }
-function vsProductFormHtml(artistId, prefix) {
+function vsProductFormHtml(groupId, prefix) {
     return `<div class="vs-form"><div class="vc-2"><input id="${prefix}_name" placeholder="Nama produk (mis. Album Vol.1 / Hoodie)"><select id="${prefix}_kind"><option value="album">Album</option><option value="merch">Merch / Aksesoris</option></select></div>
         <div class="vc-2"><input id="${prefix}_price" type="number" min="1000" placeholder="Harga (Rp)"><input id="${prefix}_qty" type="number" min="0" placeholder="Stok"></div>
         <textarea id="${prefix}_desc" rows="2" placeholder="Deskripsi singkat"></textarea>
         <label class="vc-row"><span>Foto produk (maks 3, dipotong 1:1)</span><input type="file" id="${prefix}_photo" accept="image/*" multiple></label>
-        <button type="button" class="vs-btn" onclick="vsAddProduct('${artistId}', '${prefix}')">Tambah produk</button></div>`;
+        <button type="button" class="vs-btn" onclick="vsAddProduct(${groupId}, '${prefix}')">Tambah produk</button></div>`;
 }
 function vsStoreGrid(products, withOwner) {
     if (!products.length) return `<p class="vs-empty">Belum ada produk.</p>`;
@@ -4235,15 +4377,44 @@ function vsArtistCircle(a) {
     const has = vsStoriesOf(a.id).length > 0;
     return `<button type="button" class="vs-circle ${has ? 'story' : ''}" onclick="${has ? `vsOpenStory('${a.id}')` : `vsOpenArtist('${a.id}')`}">${vsAv(a.photo, a.name, 'lg')}<span>${escHtml(a.name)}</span></button>`;
 }
-async function vsLogin(e) {
+async function vsStaffLogin(e) {
     e.preventDefault();
-    const n = document.getElementById('vsLName').value.trim().toLowerCase(), c = document.getElementById('vsLCode').value.trim();
-    const a = (appData.verseArtists || []).find(x => String(x.loginName || '').toLowerCase() === n && String(x.code || '') === c && n);
-    if (!a) { document.getElementById('vsLMsg').textContent = 'Nama akun atau kode salah.'; return; }
-    try { sessionStorage.setItem('lorevia_verse_artist', a.id); } catch (er) {}
-    VSC.text = ''; VSC.photos = []; renderView();
+    const msg = document.getElementById('vsLMsg'), btn = e.target.querySelector('button[type=submit]');
+    const name = document.getElementById('vsLName').value.trim(), pass = document.getElementById('vsLPass').value;
+    const g = vsGroupBySlug(VS.loginSlug);
+    if (!name || !pass) { msg.textContent = 'Isi nama dan sandi.'; return; }
+    btn.disabled = true; msg.textContent = 'Memeriksa...';
+    try {
+        const rec = await window.loreviaLogins.get(name);
+        if (!rec || !(await vsCheckCred(rec, pass)) || (g && rec.groupId !== g.id)) { msg.textContent = 'Nama atau sandi salah.'; btn.disabled = false; return; }
+        try { localStorage.setItem('lorevia_verse_staff', JSON.stringify({ kind: rec.kind, id: rec.refId })); } catch (er) {}
+        VS.loginSlug = ''; VS.tab = 'me'; VS.artistId = null; VSC.text = ''; VSC.photos = []; VSC.spotify = '';
+        history.replaceState(null, '', location.pathname.replace(/\/[^\/]*login\/?$/, '/') + '?p=verse');
+        renderView();
+    } catch (er) { console.error(er); msg.textContent = 'Gagal masuk: ' + vsErr(er); btn.disabled = false; }
 }
-function vsLogout() { try { sessionStorage.removeItem('lorevia_verse_artist'); } catch (e) {} renderView(); }
+function vsGroupBySlug(slug) { return (appData.verseGroups || []).find(g => vsSlug(g.slug || g.name) === slug) || null; }
+async function vsFanSubmit(e) {
+    e.preventDefault();
+    const msg = document.getElementById('vsFMsg'), btn = e.target.querySelector('button[type=submit]');
+    const name = document.getElementById('vsFName').value.trim(), pass = document.getElementById('vsFPass').value;
+    if (name.length < 3) { msg.textContent = 'Nama minimal 3 karakter.'; return; }
+    if (pass.length < 6) { msg.textContent = 'Sandi minimal 6 karakter.'; return; }
+    btn.disabled = true; msg.textContent = 'Memeriksa...';
+    try {
+        const rec = await window.loreviaFans.get(name);
+        if (VS.gate === 'register') {
+            if (rec) { msg.textContent = 'Nama ini sudah dipakai. Pilih nama lain.'; btn.disabled = false; return; }
+            const cred = await vsMakeCred(pass);
+            await window.loreviaFans.set(name, { name, salt: cred.salt, hash: cred.hash, ts: Date.now() });
+        } else if (!rec || !(await vsCheckCred(rec, pass))) { msg.textContent = 'Nama atau sandi salah.'; btn.disabled = false; return; }
+        try { localStorage.setItem('lorevia_verse_fan', name); } catch (er) {}
+        renderView();
+    } catch (er) { console.error(er); msg.textContent = 'Gagal: ' + vsErr(er); btn.disabled = false; }
+}
+function vsErr(er) { const c = String((er && (er.code || er.message)) || er); return /permission|denied/i.test(c) ? 'aturan database (rules) belum dipublish di Firebase.' : /offline|network|unavailable/i.test(c) ? 'tidak ada koneksi internet.' : c.slice(0, 120); }
+function vsGate(m) { VS.gate = m; renderView(); }
+function vsLogout() { try { localStorage.removeItem('lorevia_verse_staff'); localStorage.removeItem('lorevia_verse_fan'); } catch (e) {} VS.tab = 'home'; VS.artistId = null; renderView(); }
 async function vsAddStory() {
     const me = vsSession(); if (!me) return;
     const f = document.getElementById('vsStoryFile').files[0]; if (!f) { alert('Pilih foto story dulu.'); return; }
@@ -4259,57 +4430,90 @@ async function vsAddStory() {
 // ---------- Tampilan ----------
 function vsPanelHtml(me) {
     const mine = (appData.versePosts || []).filter(p => p.authorType === 'artist' && p.authorId === me.id).sort((a, b) => b.ts - a.ts);
-    const prods = (appData.products || []).filter(p => p.artistId === me.id);
     return `<section class="vs-card vs-glass"><div class="vs-me">${vsAv(me.photo, me.name, 'lg')}<div><b>${escHtml(me.name)}</b><span class="vs-mut">${escHtml((vsGroup(me.groupId) || {}).name || '')}</span></div><button type="button" class="vs-link" onclick="vsLogout()">Keluar</button></div></section>
         <section class="vs-card vs-glass"><h4>Postingan baru</h4>${vsComposerHtml('artist', me.id, me.groupId)}</section>
         <section class="vs-card vs-glass"><h4>Story (24 jam)</h4><div class="vs-form"><input type="file" id="vsStoryFile" accept="image/*"><input id="vsStoryCap" placeholder="Keterangan (opsional)"><button type="button" class="vs-btn" onclick="vsAddStory()">Pasang story</button></div></section>
-        <section class="vs-card vs-glass"><h4>Store saya (album &amp; merchandise)</h4>${vsProductFormHtml(me.id, 'vpm')}${vsStoreGrid(prods, true)}</section>
         <section class="vs-card"><h4>Postingan saya</h4>${mine.length ? mine.map(vsPostHtml).join('') : '<p class="vs-empty">Belum ada postingan.</p>'}</section>`;
 }
+function vsGroupPanelHtml(g) {
+    const mine = (appData.versePosts || []).filter(p => p.authorType === 'group' && p.authorId === g.id).sort((a, b) => b.ts - a.ts);
+    return `<section class="vs-card vs-glass"><div class="vs-me">${vsAv(g.photo, g.name, 'lg')}<div><b>${escHtml(g.name)}</b><span class="vs-mut">Akun grup resmi</span></div><button type="button" class="vs-link" onclick="vsLogout()">Keluar</button></div></section>
+        <section class="vs-card vs-glass"><h4>Postingan baru (sebagai grup)</h4>${vsComposerHtml('group', g.id, g.id)}</section>
+        <section class="vs-card"><h4>Postingan grup</h4>${mine.length ? mine.map(vsPostHtml).join('') : '<p class="vs-empty">Belum ada postingan.</p>'}</section>`;
+}
 function vsMeHtml() {
-    const me = vsSession();
+    const me = vsSession(), gs = vsGroupSession();
     if (me) return vsPanelHtml(me);
-    return `<section class="vs-card vs-glass"><h4>Masuk akun artis</h4><p class="vs-mut">Akun artis dibuat oleh admin Lorevia di Dasbor. Masuk dengan nama akun dan kode dari admin.</p>
-        <form class="vs-form" onsubmit="vsLogin(event)"><input id="vsLName" placeholder="Nama akun" autocomplete="off"><input id="vsLCode" type="password" placeholder="Kode" autocomplete="off"><button class="vs-btn" type="submit">Masuk</button><div id="vsLMsg" class="vs-mut"></div></form></section>`;
+    if (gs) return vsGroupPanelHtml(gs);
+    const fan = vsFan();
+    return `<section class="vs-card vs-glass"><div class="vs-me"><span class="vs-av lg"><b>${escHtml((fan || '?').charAt(0).toUpperCase())}</b></span><div><b>${escHtml(fan || 'Admin')}</b><span class="vs-mut">Akun pengguna Lorevia Verse</span></div>${fan ? '<button type="button" class="vs-link" onclick="vsLogout()">Keluar</button>' : ''}</div></section>
+        <p class="vs-mut" style="text-align:center;padding:6px 14px">Artis dan akun grup masuk lewat link login grup masing-masing dari admin Lorevia.</p>`;
+}
+function vsGateHtml() {
+    const reg = VS.gate === 'register';
+    return `<section class="vs-card vs-glass vs-gate"><span class="vs-gate-logo">${LOGO_VERSE}</span><h3>Lorevia Verse</h3>
+        <p class="vs-mut">${reg ? 'Buat akun untuk melihat aktivitas idol Lorevia.' : 'Masuk untuk melihat aktivitas idol Lorevia.'}</p>
+        <div class="vs-tabs"><button type="button" class="${reg ? '' : 'on'}" onclick="vsGate('login')">Masuk</button><button type="button" class="${reg ? 'on' : ''}" onclick="vsGate('register')">Daftar</button></div>
+        <form class="vs-form" onsubmit="vsFanSubmit(event)"><input id="vsFName" placeholder="Nama pengguna" autocomplete="username"><input id="vsFPass" type="password" placeholder="Sandi (min. 6 karakter)" autocomplete="${reg ? 'new-password' : 'current-password'}">
+        <button class="vs-btn" type="submit">${reg ? 'Daftar &amp; masuk' : 'Masuk'}</button><div id="vsFMsg" class="vs-mut"></div></form></section>`;
+}
+function vsStaffLoginHtml() {
+    const g = vsGroupBySlug(VS.loginSlug);
+    return `<section class="vs-card vs-glass vs-gate">${g ? vsAv(g.photo, g.name, 'xl') : `<span class="vs-gate-logo">${LOGO_VERSE}</span>`}<h3>${g ? escHtml(g.name) : 'Akun grup'}</h3>
+        <p class="vs-mut">Masuk dengan nama dan sandi akun ${g ? 'grup ' + escHtml(g.name) : 'grup'} atau akun artisnya.</p>
+        <form class="vs-form" onsubmit="vsStaffLogin(event)"><input id="vsLName" placeholder="Nama akun" autocomplete="username"><input id="vsLPass" type="password" placeholder="Sandi" autocomplete="current-password">
+        <button class="vs-btn" type="submit">Masuk</button><div id="vsLMsg" class="vs-mut"></div></form>
+        <button type="button" class="vs-link" onclick="VS.loginSlug=''; history.replaceState(null,'','/?p=verse'); renderView()">Bukan akun grup? Masuk sebagai pengguna</button></section>`;
 }
 function vsHomeHtml() {
     const groups = appData.verseGroups || [];
     if (!groups.length) return `<p class="vs-empty">Belum ada akun grup. Admin dapat menambahkannya di Dasbor Admin &rarr; Lorevia Verse.</p>`;
     const g = vsGroup(VS.groupId) || groups[0];
     const artists = (appData.verseArtists || []).filter(a => a.groupId === g.id);
-    const posts = (appData.versePosts || []).filter(p => p.authorType === 'group' && p.authorId === g.id).sort((a, b) => b.ts - a.ts);
+    const posts = (appData.versePosts || []).filter(p => p.groupId === g.id || (p.authorType === 'group' && p.authorId === g.id)).sort((a, b) => b.ts - a.ts);
     return `${groups.length > 1 ? `<div class="vs-row">${groups.map(x => `<button type="button" class="vs-circle ${x.id === g.id ? 'sel' : ''}" onclick="vsOpenGroup('${x.id}')">${vsAv(x.photo, x.name, 'lg')}<span>${escHtml(x.name)}</span></button>`).join('')}</div>` : ''}
         <section class="vs-hero vs-glass"><div class="vs-cover" ${g.banner ? `style="background-image:url('${escHtml(g.banner)}')"` : ''}></div>
             <div class="vs-hero-in">${vsAv(g.photo, g.name, 'xl')}<h2>${escHtml(g.name)}</h2><p>${escHtml(g.bio || '')}</p><small>${artists.length} artis · ${posts.length} postingan</small></div></section>
         <h4 class="vs-h">Artis</h4>${artists.length ? `<div class="vs-row">${artists.map(vsArtistCircle).join('')}</div>` : '<p class="vs-empty">Belum ada akun artis di grup ini.</p>'}
-        <h4 class="vs-h">Postingan grup</h4>${posts.length ? posts.map(vsPostHtml).join('') : '<p class="vs-empty">Belum ada postingan dari grup.</p>'}`;
+        <h4 class="vs-h">Feed</h4>${posts.length ? posts.map(vsPostHtml).join('') : '<p class="vs-empty">Belum ada postingan.</p>'}`;
 }
 function vsArtistHtml(a) {
     const g = vsGroup(a.groupId);
     const posts = (appData.versePosts || []).filter(p => p.authorType === 'artist' && p.authorId === a.id).sort((x, y) => y.ts - x.ts);
-    const prods = (appData.products || []).filter(p => p.artistId === a.id);
     const has = vsStoriesOf(a.id).length > 0;
     return `<button type="button" class="vs-backlink" onclick="vsBackArtist()">${VS_ICON.back} ${escHtml(g ? g.name : 'Kembali')}</button>
         <section class="vs-hero vs-glass"><div class="vs-cover"></div><div class="vs-hero-in"><button type="button" class="vs-circle ${has ? 'story' : ''}" onclick="${has ? `vsOpenStory('${a.id}')` : ''}">${vsAv(a.photo, a.name, 'xl')}</button><h2>${escHtml(a.name)}</h2><p>${escHtml(a.bio || '')}</p><small>${g ? escHtml(g.name) : ''}</small></div></section>
-        <div class="vs-tabs"><button type="button" class="${VS.sub === 'posts' ? 'on' : ''}" onclick="vsSub('posts')">Postingan</button><button type="button" class="${VS.sub === 'store' ? 'on' : ''}" onclick="vsSub('store')">Store</button></div>
-        ${VS.sub === 'store' ? vsStoreGrid(prods, false) : (posts.length ? posts.map(vsPostHtml).join('') : '<p class="vs-empty">Belum ada postingan.</p>')}`;
+        <h4 class="vs-h">Postingan</h4>${posts.length ? posts.map(vsPostHtml).join('') : '<p class="vs-empty">Belum ada postingan.</p>'}`;
 }
 function vsArtistsHtml() {
     const groups = appData.verseGroups || [];
     if (!(appData.verseArtists || []).length) return `<p class="vs-empty">Belum ada akun artis.</p>`;
     return groups.map(g => { const as = (appData.verseArtists || []).filter(a => a.groupId === g.id); return as.length ? `<h4 class="vs-h">${escHtml(g.name)}</h4><div class="vs-grid c">${as.map(vsArtistCircle).join('')}</div>` : ''; }).join('');
 }
+function vsGroupProducts(gid) {
+    return (appData.products || []).filter(p => p.groupId === gid || (!p.groupId && p.artistId && (vsArtist(p.artistId) || {}).groupId === gid));
+}
 function vsStoreHtml() {
-    const prods = (appData.products || []).filter(p => p.artistId);
-    return `<p class="vs-mut" style="text-align:center">Album &amp; merchandise resmi dari akun artis. <a href="javascript:navigate('checkout')" class="vs-link">Lihat keranjang</a></p>` + vsStoreGrid(prods, false);
+    const groups = appData.verseGroups || [];
+    if (!groups.length) return '<p class="vs-empty">Belum ada akun grup.</p>';
+    const g = vsGroup(VS.groupId) || groups[0];
+    return (groups.length > 1 ? `<div class="vs-row">${groups.map(x => `<button type="button" class="vs-circle ${x.id === g.id ? 'sel' : ''}" onclick="vsOpenGroup('${x.id}'); vsTab('store')">${vsAv(x.photo, x.name, 'lg')}<span>${escHtml(x.name)}</span></button>`).join('')}</div>` : '')
+        + `<p class="vs-mut" style="text-align:center">Store resmi ${escHtml(g.name)} &mdash; album &amp; merchandise. <a href="javascript:navigate('checkout')" class="vs-link">Lihat keranjang</a></p>` + vsStoreGrid(vsGroupProducts(g.id), false);
+}
+function vsMusicHtml() {
+    const groups = appData.verseGroups || [];
+    const posts = (appData.versePosts || []).filter(p => p.spotify && !vsLocked(p)).sort((a, b) => b.ts - a.ts);
+    return `<h4 class="vs-h">Musik &amp; Media</h4>` + (posts.length ? posts.map(vsPostHtml).join('') : '<p class="vs-empty">Belum ada musik dari ' + (groups.length ? 'idol Lorevia' : 'akun grup') + '.</p>');
 }
 function renderView_verse() {
     const content = document.getElementById('appContent');
     if (currentRoute !== 'toko') stopPromoBanner();
     if (currentRoute !== 'verse') return;
-    let body = '';
-    if (VS.artistId && vsArtist(VS.artistId)) body = vsArtistHtml(vsArtist(VS.artistId));
-    else body = VS.tab === 'artists' ? vsArtistsHtml() : VS.tab === 'store' ? vsStoreHtml() : VS.tab === 'me' ? vsMeHtml() : vsHomeHtml();
+    let body = '', gated = false;
+    if (VS.loginSlug && !vsStaff()) { body = vsStaffLoginHtml(); gated = true; }
+    else if (!vsCanView()) { body = vsGateHtml(); gated = true; }
+    else if (VS.artistId && vsArtist(VS.artistId)) body = vsArtistHtml(vsArtist(VS.artistId));
+    else body = VS.tab === 'artists' ? vsArtistsHtml() : VS.tab === 'music' ? vsMusicHtml() : VS.tab === 'store' ? vsStoreHtml() : VS.tab === 'me' ? vsMeHtml() : vsHomeHtml();
     const navBtn = (t, ico, label) => `<button type="button" class="${VS.tab === t && !VS.artistId ? 'on' : ''}" onclick="vsTab('${t}')">${VS_ICON[ico]}<span>${label}</span></button>`;
     const keep = document.querySelector('.vs');
     const st = keep ? keep.scrollTop : 0;
@@ -4317,9 +4521,11 @@ function renderView_verse() {
         <header class="vs-top"><button type="button" class="vs-round" onclick="navigate('beranda')" aria-label="Kembali ke situs">${VS_ICON.back}</button>
             <div class="vs-brand"><span>${LOGO_VERSE}</span><b>Lorevia Verse</b></div><span class="vs-round ghost"></span></header>
         <main class="vs-main">${body}</main>
-        <nav class="vs-nav vs-glass">${navBtn('home', 'home', 'Home')}${navBtn('artists', 'people', 'Artis')}${navBtn('store', 'bag', 'Store')}${navBtn('me', 'me', 'Akun')}</nav></div>`;
+        ${gated ? '' : `<nav class="vs-nav vs-glass">${navBtn('home', 'home', 'Home')}${navBtn('artists', 'people', 'Artis')}${navBtn('music', 'note', 'Musik')}${navBtn('store', 'bag', 'Store')}${navBtn('me', 'me', 'Profil')}</nav>`}</div>`;
     const el = document.querySelector('.vs'); if (el && st) el.scrollTop = st;
 }
+
+function openProfil() { VS.tab = 'me'; VS.artistId = null; if (window.PAGE_ROUTE === 'verse') renderView(); else navigate('verse'); }
 
 
 // ======== Halaman: medpart ========
@@ -5202,7 +5408,7 @@ var LOGO_DISPATCH = '<svg viewBox="0 0 48 48" aria-hidden="true"><defs><linearGr
 
     function bannerHtml() {
         return '<div class="ib-card">' +
-            '<img class="ib-logo" src="logo.png" alt="Logo Lorevia Entertainment">' +
+            '<img class="ib-logo" src="/logo.png" alt="Logo Lorevia Entertainment">' +
             '<div class="ib-text"><b>' + (ADMIN ? 'Lorevia Admin' : 'Lorevia Entertainment') + '</b><span>' + (ADMIN ? 'Aplikasi khusus admin untuk mengelola konten.' : 'Pasang aplikasinya: lebih cepat &amp; dibuka tanpa browser.') + '</span></div>' +
             '<button class="ib-go" id="ibGo" aria-label="Unduh aplikasi"><svg class="ico" aria-hidden="true"><use href="#download"></use></svg><span>Unduh Aplikasi</span></button>' +
             '<button class="ib-x" id="ibX" aria-label="Tutup">&times;</button></div>';
@@ -5252,7 +5458,7 @@ var LOGO_DISPATCH = '<svg viewBox="0 0 48 48" aria-hidden="true"><defs><linearGr
     }
 
     // ---- Tampilan aplikasi: tab bar bawah + menu launcher ----
-    var TABS = [['beranda', 'home', 'Beranda'], ['aktivitas', 'movie-open', 'Aktivitas'], ['member', 'star', 'Artis'], ['pengumuman', 'bullhorn', 'Info']];
+    var TABS = [['beranda', 'home', 'Beranda'], ['aktivitas', 'movie-open', 'Aktivitas'], ['member', 'star', 'Artis'], ['__profil', 'people', 'Profil']];
     var TILES = [['about', 'flower', 'About'], ['history', 'history', 'History'], ['kerjasama', 'people', 'Kerja Sama'], ['aktivitas', 'movie-open', 'Aktivitas'],
         ['struktur', 'butterfly', 'Struktur'], ['member', 'star', 'Members'], ['pengumuman', 'bullhorn', 'Pengumuman'], ['achievement', 'trophy', 'Achievement'],
         ['medpart', 'play-circle', 'Promote'], ['toko', 'shopping', 'Store'], ['guestbox', 'mailbox', 'Guest Box']];
@@ -5261,7 +5467,7 @@ var LOGO_DISPATCH = '<svg viewBox="0 0 48 48" aria-hidden="true"><defs><linearGr
         var bar = document.createElement('nav');
         bar.id = 'appTabs';
         bar.innerHTML = TABS.map(function (t) {
-            return '<button class="app-tab" data-route="' + t[0] + '" onclick="navigate(\'' + t[0] + '\')"><svg class="ico" aria-hidden="true"><use href="#' + t[1] + '"></use></svg><span>' + t[2] + '</span></button>';
+            return '<button class="app-tab" data-route="' + t[0] + '" onclick="' + (t[0] === '__profil' ? 'openProfil()' : 'navigate(\'' + t[0] + '\')') + '"><svg class="ico" aria-hidden="true"><use href="#' + t[1] + '"></use></svg><span>' + t[2] + '</span></button>';
         }).join('') + '<button class="app-tab" data-route="__menu" onclick="openAppMenu()"><svg class="ico" aria-hidden="true"><use href="#people"></use></svg><span>Menu</span></button>';
         document.body.appendChild(bar);
         var m = document.createElement('div');
