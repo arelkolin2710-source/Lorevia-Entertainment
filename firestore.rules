@@ -103,7 +103,8 @@ service cloud.firestore {
           && body().type in ['video', 'audio', 'versePost']
           && body().itemId is string && body().itemId.size() <= 80
           && body().name is string && body().name.size() > 0 && body().name.size() <= 60
-          && body().text is string && body().text.size() > 0 && body().text.size() <= 500;
+          && body().text is string && body().text.size() > 0 && body().text.size() <= 500
+          && str('uid', 128) && str('av', 14000) && str('by', 80);
     }
 
 
@@ -123,7 +124,14 @@ service cloud.firestore {
       return small() && has('kind') && body().kind in ['artist', 'group'] && str('refId', 80) && str('groupId', 80) && has('ver') && str('ver', 40) && num('ts');
     }
     function okProfile() {
-      return small() && str('nickname', 40) && str('uid', 128) && num('ts');
+      return small() && str('nickname', 40) && str('uid', 128) && str('bio', 300) && str('photo', 120000) && str('av', 14000)
+          && str('cover', 250000) && arr('unfollow', 300) && num('joined') && num('ts');
+    }
+    // postingan penggemar (foto + Spotify) di komunitas
+    function okFanPost() {
+      return small() && request.auth != null && body().uid == request.auth.uid
+          && str('name', 60) && str('av', 14000) && str('groupId', 80) && str('text', 2000) && arr('photos', 4)
+          && (!has('spotify') || body().spotify is map) && num('likes') && num('ts');
     }
     function okLetter() {
       return small() && request.auth != null && body().fromUid == request.auth.uid
@@ -425,6 +433,17 @@ service cloud.firestore {
       allow list: if false;
       allow create, update: if request.auth != null && request.auth.uid == uid && okProfile();
       allow delete: if request.auth != null && request.auth.uid == uid;
+    }
+
+    // ---------------------------------------------------------------
+    // 27b. LOREVIA VERSE: POSTINGAN PENGGEMAR (siapa pun boleh membaca; hanya pemilik yang membuat/mengubah/menghapus; suka boleh oleh semua)
+    // ---------------------------------------------------------------
+    match /verseFanPosts/{id} {
+      allow get, list: if true;
+      allow create: if okFanPost();
+      allow update: if (request.auth != null && resource.data.uid == request.auth.uid && okFanPost())
+          || request.resource.data.diff(resource.data).affectedKeys().hasOnly(['likes']);
+      allow delete: if request.auth != null && resource.data.uid == request.auth.uid;
     }
 
     // ---------------------------------------------------------------
