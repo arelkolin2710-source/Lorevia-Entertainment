@@ -2,7 +2,9 @@ rules_version = '2';
 
 // =====================================================================
 // LOREVIA ENTERTAINMENT RVN 🌿 - ATURAN DATABASE (FIRESTORE)
-// Situs tidak memakai login, jadi baca/tulis terbuka, tetapi:
+// Konten situs & dasbor admin tanpa login (baca/tulis terbuka, tetapi dibatasi bentuk datanya).
+// Lorevia Verse memakai Firebase Authentication (Google) untuk surat, profil, dan vote.
+// Pembatasan:
 //  - hanya koleksi yang terdaftar di bawah yang bisa dipakai,
 //  - setiap fitur punya fungsi pemeriksa sendiri (tipe & panjang data),
 //  - pemeriksaan hanya berlaku bila kolomnya ada (data lama tetap aman).
@@ -107,17 +109,47 @@ service cloud.firestore {
 
     // ---- Lorevia Verse ----
     function okVerseGroup() {
-      return base() && has('name') && str('name', 100) && body().name.size() > 0 && str('bio', 500) && str('slug', 60) && str('loginName', 80) && pic('photo') && pic('banner');
+      return base() && has('name') && str('name', 100) && body().name.size() > 0 && str('bio', 500) && str('slug', 60) && str('staffVer', 40) && str('emailHint', 80) && pic('photo') && pic('banner');
     }
     function okVerseArtist() {
       return base() && has('name') && str('name', 100) && body().name.size() > 0 && str('groupId', 80) && str('bio', 500)
-          && str('loginName', 80) && pic('photo');
+          && str('staffVer', 40) && str('emailHint', 80) && pic('photo');
     }
-    function okCred() {
-      return base() && has('salt') && has('hash') && str('salt', 64) && str('hash', 128) && str('kind', 10) && str('refId', 80) && str('groupId', 80);
+    function okVerseEvent() {
+      return base() && str('title', 150) && str('desc', 500) && num('end') && num('ts') && arr('candidates', 30)
+          && (!has('status') || body().status in ['open', 'closed']);
     }
-    function okFan() {
-      return base() && has('name') && has('salt') && has('hash') && str('name', 60) && str('salt', 64) && str('hash', 128) && num('ts');
+    function okStaff() {
+      return small() && has('kind') && body().kind in ['artist', 'group'] && str('refId', 80) && str('groupId', 80) && has('ver') && str('ver', 40) && num('ts');
+    }
+    function okProfile() {
+      return small() && str('nickname', 40) && str('uid', 128) && num('ts');
+    }
+    function okLetter() {
+      return small() && request.auth != null && body().fromUid == request.auth.uid
+          && body().text is string && body().text.size() >= 5 && body().text.size() <= 1000
+          && body().toArtistId is string && body().toArtistId.size() <= 80
+          && str('fromName', 60) && str('toName', 100) && str('groupId', 80) && num('ts');
+    }
+    // peran artis/grup yang sah: dokumen verseStaff milik email Google ini + versinya cocok dengan data akun
+    function staffDoc() {
+      return get(/databases/$(database)/documents/verseStaff/$(request.auth.token.email.lower())).data;
+    }
+    function isStaffFor(toId) {
+      return request.auth != null && request.auth.token.email_verified == true
+          && exists(/databases/$(database)/documents/verseStaff/$(request.auth.token.email.lower()))
+          && staffDoc().refId == toId
+          && (staffDoc().kind == 'artist'
+              ? get(/databases/$(database)/documents/verseArtists/$(toId)).data.get('staffVer', '') == staffDoc().ver
+              : get(/databases/$(database)/documents/verseGroups/$(toId)).data.get('staffVer', '') == staffDoc().ver);
+    }
+    function okVote(id) {
+      return request.auth != null && body().uid == request.auth.uid && has('eventId') && body().eventId is string
+          && id == body().eventId + '_' + request.auth.uid
+          && body().keys().hasOnly(['eventId', 'uid', 'artistId', 'ts'])
+          && exists(/databases/$(database)/documents/verseEvents/$(body().eventId))
+          && get(/databases/$(database)/documents/verseEvents/$(body().eventId)).data.get('status', '') == 'open'
+          && body().artistId in get(/databases/$(database)/documents/verseEvents/$(body().eventId)).data.get('candidates', []);
     }
     function okVersePost() {
       return base() && str('text', 3000) && arr('photos', 10) && str('groupId', 80) && str('authorId', 80)
@@ -335,7 +367,7 @@ service cloud.firestore {
     }
 
     // ---------------------------------------------------------------
-    // 22. LOREVIA VERSE: AKUN ARTIS (data profil; sandi ada di verseLogins)
+    // 22. LOREVIA VERSE: AKUN ARTIS (data profil; email login ada di verseStaff)
     // ---------------------------------------------------------------
     match /verseArtists/{id} {
       allow get, list: if true;
@@ -375,29 +407,59 @@ service cloud.firestore {
     }
 
     // ---------------------------------------------------------------
-    // 26. LOREVIA VERSE: LOGIN GRUP & ARTIS (sandi di-hash; daftar dilarang, hanya get per nama)
+    // 26. LOREVIA VERSE: PERAN ARTIS/GRUP (email Google -> akun; admin yang menulis)
     // ---------------------------------------------------------------
-    match /verseLogins/{id} {
+    match /verseStaff/{email} {
       allow get: if true;
       allow list: if false;
-      allow create: if okCred();
-      allow update: if okCred();
+      allow create: if okStaff();
+      allow update: if okStaff();
       allow delete: if true;
     }
 
     // ---------------------------------------------------------------
-    // 27. LOREVIA VERSE: AKUN PENGGUNA/PENONTON (daftar baru saja, tidak bisa diubah/dihapus)
+    // 27. LOREVIA VERSE: PROFIL PENGGUNA (nama panggilan; hanya pemilik akun Google)
     // ---------------------------------------------------------------
-    match /verseFans/{id} {
-      allow get: if true;
+    match /verseProfiles/{uid} {
+      allow get: if request.auth != null && request.auth.uid == uid;
       allow list: if false;
-      allow create: if okFan();
-      allow update: if false;
-      allow delete: if false;
+      allow create, update: if request.auth != null && request.auth.uid == uid && okProfile();
+      allow delete: if request.auth != null && request.auth.uid == uid;
     }
 
     // ---------------------------------------------------------------
-    // 28. PENGATURAN UMUM (cadangan, tidak boleh dihapus)
+    // 28. LOREVIA VERSE: SURAT PENGGEMAR UNTUK IDOL (hanya pengirim & artis/grup penerima)
+    // ---------------------------------------------------------------
+    match /verseLetters/{id} {
+      allow get, list: if request.auth != null
+          && (resource.data.fromUid == request.auth.uid || isStaffFor(resource.data.toArtistId));
+      allow create: if okLetter();
+      allow update: if false;
+      allow delete: if request.auth != null && resource.data.fromUid == request.auth.uid;
+    }
+
+    // ---------------------------------------------------------------
+    // 29. LOREVIA VERSE: EVENT VOTE
+    // ---------------------------------------------------------------
+    match /verseEvents/{id} {
+      allow get, list: if true;
+      allow create: if okVerseEvent();
+      allow update: if okVerseEvent();
+      allow delete: if true;
+    }
+
+    // ---------------------------------------------------------------
+    // 30. LOREVIA VERSE: SUARA VOTE (1 akun Google = 1 suara per event; tidak bisa diubah)
+    // ---------------------------------------------------------------
+    match /verseVotes/{id} {
+      allow get, list: if true;
+      allow create: if okVote(id);
+      allow update: if false;
+      allow delete: if !exists(/databases/$(database)/documents/verseEvents/$(resource.data.eventId));
+    }
+
+    // ---------------------------------------------------------------
+    // 31. PENGATURAN UMUM (cadangan, tidak boleh dihapus)
     // ---------------------------------------------------------------
     match /settings/{id} {
       allow get, list: if true;

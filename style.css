@@ -955,3 +955,76 @@ html.app-mode #musicBar { bottom: 100px; }
 .dp-card { background: #fff; border: 1px solid rgba(20,83,45,.08); box-shadow: 0 8px 24px rgba(20,60,40,.08); backdrop-filter: none; -webkit-backdrop-filter: none; }
 .dp-meta { color: #2e8b57; } .dp-card h3 { color: #14291f; } .dp-text { color: #33463c; } .dp-text a { color: #1f7a45; }
 .dp-top small { color: #4b6355; opacity: 1; }
+
+/* =====================================================================
+   LOREVIA VERSE v2: liquid glass gelembung (referensi UI mobile), login Google, surat, vote
+   ===================================================================== */
+.lv-img { width: 100%; height: 100%; object-fit: cover; display: block; border-radius: inherit; }
+.vs { background: linear-gradient(170deg, #ffeaf5 0%, #fdf1fb 40%, #f3ecff 100%); }
+.vs-bg i { opacity: .38; filter: blur(70px); }
+.vs-brand span { border-radius: 10px; overflow: hidden; } .vs-brand span .lv-img { border-radius: 10px; }
+/* gelembung kaca */
+.bub { position: relative; overflow: hidden; touch-action: none; user-select: none; -webkit-user-select: none; -webkit-tap-highlight-color: transparent; will-change: transform;
+  background: radial-gradient(circle at 30% 22%, rgba(255,255,255,.95) 0 9%, rgba(255,255,255,.42) 28%, rgba(255,190,225,.22) 68%, rgba(255,140,205,.3) 100%) !important;
+  border: 1px solid rgba(255,255,255,.85) !important; backdrop-filter: blur(14px) saturate(190%); -webkit-backdrop-filter: blur(14px) saturate(190%);
+  box-shadow: inset 0 7px 10px rgba(255,255,255,.85), inset 0 -8px 14px rgba(255,120,190,.28), 0 10px 22px rgba(214,90,170,.28) !important; transition: box-shadow .25s, filter .25s; }
+.bub.held { filter: brightness(1.06) saturate(1.2); animation: bubWob .7s ease-in-out infinite; box-shadow: inset 0 9px 14px rgba(255,255,255,.95), inset 0 -10px 16px rgba(255,120,190,.38), 0 16px 30px rgba(214,90,170,.4) !important; }
+@keyframes bubWob { 0%,100% { border-radius: 50% 50% 50% 50% / 50% 50% 50% 50%; } 33% { border-radius: 46% 54% 50% 50% / 54% 46% 54% 46%; } 66% { border-radius: 54% 46% 48% 52% / 46% 54% 46% 54%; } }
+.bub-rip { position: absolute; width: 8px; height: 8px; margin: -4px 0 0 -4px; border-radius: 50%; border: 2px solid rgba(255,255,255,.9); pointer-events: none; animation: bubRip .7s ease-out forwards; }
+@keyframes bubRip { to { transform: scale(14); opacity: 0; } }
+.vs-round.bub { width: 42px; height: 42px; color: #c0267f; }
+/* bar navigasi */
+.vs-nav { padding: 6px 6px !important; border-radius: 34px; touch-action: none; background: linear-gradient(135deg, rgba(255,255,255,.55), rgba(255,255,255,.22)) !important;
+  backdrop-filter: blur(26px) saturate(190%); -webkit-backdrop-filter: blur(26px) saturate(190%); border: 1px solid rgba(255,255,255,.85); box-shadow: inset 0 2px 0 rgba(255,255,255,.95), inset 0 -6px 14px rgba(255,150,210,.18), 0 14px 34px rgba(214,90,170,.3); }
+.vs-nav .nav-blob { position: absolute; left: 0; top: 0; border-radius: 28px; pointer-events: none; z-index: 0; transition: transform .45s cubic-bezier(.3,1.5,.5,1), width .3s, height .3s;
+  background: radial-gradient(circle at 30% 18%, rgba(255,255,255,.95) 0 8%, rgba(255,255,255,.5) 30%, rgba(255,150,210,.4) 80%); border: 1px solid rgba(255,255,255,.9); overflow: hidden;
+  box-shadow: inset 0 6px 10px rgba(255,255,255,.9), inset 0 -8px 12px rgba(255,100,185,.3), 0 8px 18px rgba(214,90,170,.35); backdrop-filter: blur(8px); }
+.vs-nav .nav-blob.held { animation: bubWob .7s ease-in-out infinite; filter: brightness(1.08); }
+.vs-nav button.bub { background: none !important; border: 0 !important; box-shadow: none !important; backdrop-filter: none; position: relative; z-index: 1; color: #a45a93; overflow: visible; animation: none; filter: none; }
+.vs-nav button.bub.on, .vs-nav button.bub.hov { color: #c0267f !important; background: none !important; box-shadow: none !important; }
+.vs-nav button.bub.center svg { width: 26px; height: 26px; }
+.vs-nav button.bub span { font-size: .62rem; }
+/* layar sambutan / login */
+.vs.splash { display: flex; align-items: center; justify-content: center; }
+.vs-splash { position: relative; z-index: 2; width: 100%; padding: 20px; display: flex; justify-content: center; }
+.vs-splash-card { width: 100%; max-width: 380px; text-align: center; padding: 34px 24px 26px; border-radius: 40px; display: flex; flex-direction: column; align-items: center; gap: 12px;
+  background: linear-gradient(145deg, rgba(255,255,255,.7), rgba(255,255,255,.24)); backdrop-filter: blur(26px) saturate(190%); -webkit-backdrop-filter: blur(26px) saturate(190%); border: 1px solid rgba(255,255,255,.9);
+  box-shadow: inset 0 2px 0 rgba(255,255,255,.95), 0 24px 60px rgba(214,90,170,.3); }
+.vs-splash-logo, .vs-splash-av { width: 112px; height: 112px; border-radius: 34px; overflow: hidden; display: block; box-shadow: 0 14px 34px rgba(214,90,170,.45); border: 2px solid rgba(255,255,255,.9); }
+.vs-splash-av { border-radius: 50%; } .vs-splash-av .vs-av { width: 100%; height: 100%; border: 0; }
+.vs-splash h1 { font-size: 1.7rem; font-weight: 800; color: #b0307f; margin-top: 4px; } .vs-splash p { font-size: .86rem; line-height: 1.5; color: #7a4b6e; }
+.vs-google { display: inline-flex; align-items: center; justify-content: center; gap: 10px; width: 100%; padding: 13px 18px; border-radius: 999px; font-weight: 700; font-size: .92rem; color: #3b1a35; cursor: pointer; margin-top: 6px; }
+.vs-google:disabled { opacity: .6; }
+.vs-note { font-size: .78rem; line-height: 1.45; color: #8a2b6a; background: rgba(255,255,255,.6); border: 1px solid rgba(255,255,255,.9); border-radius: 16px; padding: 10px 14px; }
+.vs-btn.ghost { background: rgba(255,255,255,.55); color: #b0307f; box-shadow: none; border: 1px solid rgba(255,255,255,.9); }
+/* tab atas, banner, pencarian, komunitas */
+.vs-tabs2 { display: flex; gap: 22px; padding: 4px 6px 0; margin-bottom: 6px; } .vs-tabs2 button { background: none; border: 0; padding: 8px 2px; font-weight: 800; font-size: 1rem; color: #b79ab0; cursor: pointer; border-bottom: 3px solid transparent; } .vs-tabs2 button.on { color: #8a2b6a; border-color: #ee5aa5; }
+.vs-stories { padding-top: 4px; } .vs-circle.on .vs-av { box-shadow: 0 6px 16px rgba(214,90,170,.3); } .vs-av.star { color: #ee5aa5; }
+.vs-banner { display: flex; flex-direction: column; gap: 2px; width: 100%; text-align: left; padding: 18px; margin: 6px 0 4px; border: 0; cursor: pointer; background: linear-gradient(135deg, rgba(190,150,255,.75), rgba(255,140,200,.7)); color: #fff; border-radius: 26px; }
+.vs-banner small { letter-spacing: .14em; font-weight: 800; opacity: .9; } .vs-banner b { font-size: 1.25rem; } .vs-banner span { font-size: .8rem; opacity: .95; }
+.vs-search { display: flex; align-items: center; gap: 8px; padding: 10px 16px; color: #b0307f; border-radius: 999px; } .vs-search input { flex: 1; border: 0; background: none; outline: none; font-size: .9rem; color: #3b1a35; }
+.vs-comm { display: flex; flex-direction: column; align-items: center; gap: 4px; min-width: 120px; padding: 14px 10px; border: 0; cursor: pointer; color: #5a2250; } .vs-comm small { font-size: .68rem; color: #8a5a7e; }
+.vs-chip { padding: 7px 16px; border-radius: 999px; border: 1px solid rgba(255,255,255,.9); background: rgba(255,255,255,.55); color: #8a2b6a; font-weight: 700; font-size: .8rem; cursor: pointer; white-space: nowrap; } .vs-chip.on { background: linear-gradient(135deg, #ff7eb9, #a78bfa); color: #fff; }
+.vs-btn.sm { padding: 7px 16px; font-size: .78rem; } .vs-btn:disabled { opacity: .55; box-shadow: none; }
+/* vote: gembok perak memudar saat belum ada event */
+.vs-votetile { display: flex; align-items: center; gap: 12px; width: 100%; padding: 14px 16px; margin: 14px 0; text-align: left; border: 0; cursor: pointer; color: #5a2250; }
+.vs-votetile > span { width: 44px; height: 44px; border-radius: 50%; display: grid; place-items: center; background: linear-gradient(135deg, #ff7eb9, #a78bfa); color: #fff; } .vs-votetile small { display: block; font-size: .72rem; color: #8a5a7e; }
+.vs-votetile.locked { cursor: not-allowed; border-radius: 24px; background: linear-gradient(135deg, rgba(255,255,255,.5), rgba(210,214,224,.35)); border: 1px solid rgba(255,255,255,.8); filter: grayscale(.85); opacity: .65; }
+.vs-votetile.locked > span { background: linear-gradient(145deg, #f6f7fa, #aeb4c2 55%, #e4e7ee); color: #fff; box-shadow: inset 0 2px 3px #fff, 0 3px 8px rgba(120,130,150,.35); }
+.vs-lockbig { text-align: center; padding: 46px 20px; margin-top: 10px; } .vs-lockbig span { display: inline-grid; place-items: center; width: 96px; height: 96px; border-radius: 50%; color: #fff; background: linear-gradient(145deg, #fbfcff, #aab0bf 55%, #e6e9f0); box-shadow: inset 0 3px 5px #fff, 0 10px 26px rgba(120,130,150,.35); opacity: .6; filter: grayscale(.6); } .vs-lockbig svg { width: 44px; height: 44px; }
+.vs-lockbig h3 { margin-top: 14px; font-weight: 800; color: #9b8fa0; } .vs-lockbig p { color: #a89aab; font-size: .84rem; line-height: 1.5; margin-top: 4px; }
+.vs-cand { display: flex; align-items: center; gap: 12px; padding: 12px; margin: 10px 0; } .vs-cand.mine { outline: 2px solid #ee5aa5; } .vs-cand-in { flex: 1; min-width: 0; } .vs-cand-in b { display: block; }
+.vs-bar { height: 8px; border-radius: 8px; background: rgba(255,255,255,.7); margin: 6px 0 2px; overflow: hidden; } .vs-bar i { display: block; height: 100%; border-radius: 8px; background: linear-gradient(90deg, #ff7eb9, #a78bfa); transition: width .6s; }
+/* surat */
+.vs-letter { padding: 14px 16px; margin: 10px 0; } .vs-letter-h { display: flex; justify-content: space-between; align-items: baseline; color: #8a2b6a; } .vs-letter p { margin-top: 6px; font-size: .88rem; line-height: 1.55; white-space: pre-wrap; word-break: break-word; color: #3b1a35; }
+.vs-form textarea { resize: vertical; }
+/* =====================================================================
+   DISPATCH: biru lembut (menimpa tema hijau sebelumnya)
+   ===================================================================== */
+.dp { color: #14233a; background: linear-gradient(170deg, #eaf3ff 0%, #f3f8ff 55%, #e3efff 100%); }
+.dp-bg i { background: rgba(80,150,240,.2); }
+.dp-top { color: #1b4f9c; background: linear-gradient(180deg, rgba(234,243,255,.96), rgba(234,243,255,0)); }
+.dp-top small { color: #4b6a93; }
+.dp-card { border: 1px solid rgba(40,100,200,.12); box-shadow: 0 8px 24px rgba(40,90,170,.12); }
+.dp-meta { color: #2f74d0; } .dp-card h3 { color: #12284a; } .dp-text { color: #2e4262; } .dp-text a { color: #1f62c4; }
+#switcher .sw-card.disp { background: linear-gradient(145deg, rgba(90,160,245,.65), rgba(30,90,190,.6)); }
