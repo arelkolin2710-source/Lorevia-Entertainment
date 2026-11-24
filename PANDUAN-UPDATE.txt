@@ -1,0 +1,31 @@
+LOREVIA ENTERTAINMENT — UPDATE
+
+ISI UPDATE
+- Tema Lorevia Verse diarahkan ke pink glassmorphism, bubble dan kartu transparan mengikuti referensi visual. Fitur Verse lama tetap dipertahankan.
+- Logo Dispatch memakai gambar dispatch-logo.jpg dari lampiran.
+- Halaman admin #loreviaadmin sekarang menampilkan form login.
+
+LOGIN ADMIN DEMO
+Nama akun: lorevia entertainment
+Password: lorevia_ent26
+Alamat: https://domain-kamu/#loreviaadmin
+
+AUTENTIKASI DAN KEAMANAN
+Penting: proyek ini adalah website statis HTML/JS. Kredensial login yang ditanam di JavaScript dapat ditemukan oleh siapa pun yang memeriksa source. Gerbang ini hanya membatasi tampilan, BUKAN pengamanan database. Firestore Rules yang lama juga mengizinkan sejumlah operasi publik. Jangan gunakan untuk data sensitif/uang/akun nyata sebelum otorisasi dipindahkan ke Firebase Authentication + custom claims dan Cloud Functions/server tepercaya.
+
+LOGIN GOOGLE LOREVIA VERSE
+Pengguna masuk memakai tombol Google resmi melalui Firebase Authentication. Pendaftaran nama panggilan/profil dilakukan di dalam aplikasi setelah Google OAuth. Jangan pernah meminta password Google di form Lorevia.
+
+AKUN KOMUNITAS/ARTIS
+Menu Lorevia Verse pada dashboard admin saat ini tetap menggunakan skema yang sudah ada: admin membuat profil grup/artis dan menghubungkan email Google pemilik melalui verseStaff. Pemilik masuk dengan akun Google yang emailnya didaftarkan admin. Akun artis/grup terpisah dari admin dan memperoleh tampilan pengelolaan sesuai fitur Verse yang sudah tersedia.
+
+FIREBASE
+Konfigurasi Firebase yang sudah ada dipertahankan. Upload firestore.rules dari paket ini ke Firebase Console > Firestore Database > Rules bila ingin mempertahankan aturan proyek saat ini. Periksa dan amankan rules sebelum produksi; jangan mengaktifkan mode publik untuk data privat.
+
+DEPLOY
+1. Ekstrak ZIP.
+2. Upload seluruh isi folder ke hosting yang sama (Vercel/Netlify), jangan hanya index.html.
+3. Pastikan app.js, style.css, firestore.rules, logo, dan dispatch-logo.jpg ikut terunggah.
+4. Di Firebase Authentication > Settings > Authorized domains, tambahkan domain website.
+5. Di Firebase Console > Authentication > Sign-in method, aktifkan Google.
+6. Pastikan Firestore Database sudah dibuat.

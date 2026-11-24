@@ -867,15 +867,12 @@ async function kirimKeSheet(type, data) {
         // Akses admin: buka  situs.com/#loreviaadmin  (tanpa sandi). Status disimpan di sessionStorage
         // supaya tetap aktif selama tab ini terbuka; tombol "Keluar Admin" menghapusnya.
         const ADMIN_HASH = '#loreviaadmin';
-        let isAdminLoggedIn = loadState('lorevia_admin_login', false);
-        if (location.hash === ADMIN_HASH) {
-            isAdminLoggedIn = true;
-            try { sessionStorage.setItem('lorevia_admin_login', 'true'); } catch (e) {}
-        }
+        // Gate antarmuka admin. Untuk keamanan produksi, autentikasi ini WAJIB dipindahkan
+        // ke Firebase Auth + custom claims/server; kredensial frontend bukan rahasia.
+        let isAdminLoggedIn = false;
+        try { isAdminLoggedIn = sessionStorage.getItem('lorevia_admin_login') === 'true'; } catch (e) {}
         function openAdminFromHash() {
             if (location.hash !== ADMIN_HASH) return;
-            isAdminLoggedIn = true;
-            try { sessionStorage.setItem('lorevia_admin_login', 'true'); } catch (e) {}
             if (currentRoute !== 'admin-dashboard') showRoute('admin-dashboard', false);
             else renderView();
         }
@@ -5623,12 +5620,31 @@ async function loadAudioPlaylistData() { audioPlaylistLoaded = true; }   // data
         }
 
 
+// Login dashboard admin (gerbang tampilan; bukan pengganti otorisasi server).
+window.loreviaAdminLogin = function(e) {
+    e.preventDefault();
+    const u = (document.getElementById('lvAdminUser')?.value || '').trim().toLowerCase();
+    const p = document.getElementById('lvAdminPass')?.value || '';
+    if (u === 'lorevia entertainment' && p === 'lorevia_ent26') {
+        isAdminLoggedIn = true;
+        try { sessionStorage.setItem('lorevia_admin_login', 'true'); } catch (_) {}
+        renderView();
+    } else {
+        const err = document.getElementById('lvAdminError');
+        if (err) err.textContent = 'Nama akun atau password tidak sesuai.';
+    }
+};
+
 // ======== Halaman: admin-dashboard ========
 // Tampilan halaman "Dasbor Admin - Lorevia Entertainment" (route: admin-dashboard).
 // Markup disalin apa adanya dari versi satu file.
         function renderView_admin_dashboard() {
             const content = document.getElementById('appContent');
             if (currentRoute !== 'toko') stopPromoBanner();
+            if (!isAdminLoggedIn) {
+                content.innerHTML = `<section class="lv-admin-gate"><div class="lv-admin-card"><div class="lv-admin-mark">L</div><p class="lv-admin-kicker">LOREVIA ENTERTAINMENT</p><h1>Admin Portal</h1><p>Masuk untuk mengelola ekosistem Lorevia.</p><form onsubmit="loreviaAdminLogin(event)"><label>Nama akun</label><input id="lvAdminUser" autocomplete="username" placeholder="Nama akun admin" required><label>Password</label><input id="lvAdminPass" type="password" autocomplete="current-password" placeholder="Password admin" required><p id="lvAdminError" role="alert"></p><button type="submit">Masuk Dashboard</button></form><a href="/">Kembali ke website</a><small>Portal internal • Lorevia Entertainment</small></div></section>`;
+                return;
+            }
             if (currentRoute === 'admin-dashboard' && isAdminLoggedIn) {
                 const tabs = [
                     { key: 'members', label: '🌱 Generasi & Member' },
@@ -6039,7 +6055,7 @@ function renderView() {
 /* ################ Cangkang situs ################ */
 // Cangkang situs: penanda halaman aktif, tombol bulat pemilih aplikasi (Dispatch / Lorevia Verse), dan ajakan mengunjungi Lorevia Verse.
 var LOGO_VERSE = '<img class="lv-img" alt="Lorevia Verse" src="data:image/jpeg;base64,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">';
-var LOGO_DISPATCH = '<svg viewBox="0 0 48 48" aria-hidden="true"><defs><linearGradient id="ldg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#6bb4f7"/><stop offset="1" stop-color="#1f5fc4"/></linearGradient></defs><rect width="48" height="48" rx="12" fill="url(#ldg)"/><rect x="11" y="12" width="26" height="24" rx="3" fill="none" stroke="#fff" stroke-width="2.4"/><path d="M16 19h16M16 24h9M16 29h9" stroke="#fff" stroke-width="2.4" stroke-linecap="round"/><path d="M28 24c3 0 5 2 5 5-3 0-5-2-5-5z" fill="#fff"/></svg>';
+var LOGO_DISPATCH = '<img src="/dispatch-logo.jpg" alt="Dispatch" style="width:100%;height:100%;object-fit:contain;border-radius:8px">';
 (function () {
     function setRoute(r) { document.documentElement.setAttribute('data-route', r || 'beranda'); var sw = document.getElementById('appSwitch'); if (sw) sw.style.display = (r === 'admin-dashboard') ? 'none' : ''; }
     window.setShellRoute = setRoute;
