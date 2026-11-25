@@ -125,13 +125,14 @@ service cloud.firestore {
     }
     function okProfile() {
       return small() && str('nickname', 40) && str('uid', 128) && str('bio', 300) && str('photo', 120000) && str('av', 14000)
-          && str('cover', 250000) && arr('unfollow', 300) && num('joined') && num('ts');
+          && str('cover', 250000) && arr('unfollow', 300) && num('joined') && num('ts')
+          && str('username', 20) && str('ph', 100) && str('ps', 60);
     }
     // postingan penggemar (foto + Spotify) di komunitas
     function okFanPost() {
       return small() && request.auth != null && body().uid == request.auth.uid
           && str('name', 60) && str('av', 14000) && str('groupId', 80) && str('text', 2000) && arr('photos', 4)
-          && (!has('spotify') || body().spotify is map) && num('likes') && num('ts');
+          && (!has('spotify') || body().spotify == null || body().spotify is map) && num('likes') && num('ts');
     }
     function okLetter() {
       return small() && request.auth != null && body().fromUid == request.auth.uid
@@ -144,7 +145,8 @@ service cloud.firestore {
       return get(/databases/$(database)/documents/verseStaff/$(request.auth.token.email.lower())).data;
     }
     function isStaffFor(toId) {
-      return request.auth != null && request.auth.token.email_verified == true
+      return request.auth != null
+          && (request.auth.token.email_verified == true || request.auth.token.email.lower().matches('.*@artist[.]lorevia[.]app'))
           && exists(/databases/$(database)/documents/verseStaff/$(request.auth.token.email.lower()))
           && staffDoc().refId == toId
           && (staffDoc().kind == 'artist'
@@ -162,7 +164,7 @@ service cloud.firestore {
     function okVersePost() {
       return base() && str('text', 3000) && arr('photos', 10) && str('groupId', 80) && str('authorId', 80)
           && (!has('authorType') || body().authorType in ['group', 'artist'])
-          && flag('exclusive') && (!has('spotify') || body().spotify is map)
+          && flag('exclusive') && (!has('spotify') || body().spotify == null || body().spotify is map)
           && (!has('price') || (body().price is number && body().price >= 0 && body().price <= 10000))
           && num('likes') && num('ts');
     }
@@ -443,6 +445,18 @@ service cloud.firestore {
       allow create: if okFanPost();
       allow update: if (request.auth != null && resource.data.uid == request.auth.uid && okFanPost())
           || request.resource.data.diff(resource.data).affectedKeys().hasOnly(['likes']);
+      allow delete: if request.auth != null && resource.data.uid == request.auth.uid;
+    }
+
+    // ---------------------------------------------------------------
+    // 27c. LOREVIA VERSE: USERNAME UNIK (dibuat sekali oleh pendaftar; tidak bisa diubah/diambil orang lain)
+    // ---------------------------------------------------------------
+    match /verseUsernames/{name} {
+      allow get: if request.auth != null;
+      allow list: if false;
+      allow create: if request.auth != null && name.matches('[a-z0-9_.]{3,20}') && request.resource.data.uid == request.auth.uid
+          && request.resource.data.keys().hasOnly(['uid', 'ts']);
+      allow update: if false;
       allow delete: if request.auth != null && resource.data.uid == request.auth.uid;
     }
 
