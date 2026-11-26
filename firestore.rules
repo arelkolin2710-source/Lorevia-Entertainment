@@ -114,7 +114,7 @@ service cloud.firestore {
     }
     function okVerseArtist() {
       return base() && has('name') && str('name', 100) && body().name.size() > 0 && str('groupId', 80) && str('bio', 500)
-          && str('staffVer', 40) && str('emailHint', 80) && pic('photo');
+          && str('staffVer', 40) && str('emailHint', 80) && pic('photo') && arr('achv', 20);
     }
     function okVerseEvent() {
       return base() && str('title', 150) && str('desc', 500) && num('end') && num('ts') && arr('candidates', 30)
@@ -174,6 +174,35 @@ service cloud.firestore {
     function okVerseUnlock() {
       return base() && str('postId', 80) && str('buyer', 100) && str('contact', 200) && str('code', 12)
           && (!has('status') || body().status in ['pending', 'paid']) && num('ts');
+    }
+
+    // ---- Langganan chat & call ----
+    function nowMs() { return request.time.toMillis(); }
+    function subActive(chatId) {
+      return exists(/databases/$(database)/documents/verseSubs/$(chatId))
+          && get(/databases/$(database)/documents/verseSubs/$(chatId)).data.end > nowMs();
+    }
+    function okSubDoc(id) {
+      return small() && request.auth != null && body().uid == request.auth.uid
+          && body().artistId is string && body().artistId.size() <= 80 && id == body().uid + '_' + body().artistId
+          && body().amount == 10000 && body().n is number && body().end is number && body().ts is number
+          && str('name', 60) && str('av', 14000) && str('groupId', 80) && num('first');
+    }
+    function okMsg() {
+      return small() && request.auth != null
+          && body().fanUid is string && body().artistId is string && body().chatId == body().fanUid + '_' + body().artistId
+          && body().text is string && body().text.size() >= 1 && body().text.size() <= 1000
+          && body().role in ['fan', 'artist'] && str('name', 60) && str('groupId', 80) && num('ts')
+          && ((body().role == 'fan' && body().fanUid == request.auth.uid && body().uid == request.auth.uid && subActive(body().chatId))
+              || (body().role == 'artist' && body().uid == request.auth.uid && isStaffFor(body().artistId)));
+    }
+    function callParty(d) {
+      return request.auth != null && (d.fanUid == request.auth.uid || isStaffFor(d.artistId));
+    }
+    function okCallDoc(id) {
+      return small() && body().fanUid is string && body().artistId is string && id == body().fanUid + '_' + body().artistId && body().chatId == id
+          && body().state in ['ringing', 'active', 'declined', 'ended']
+          && str('name', 60) && str('groupId', 80) && str('offer', 30000) && str('answer', 30000) && num('ts');
     }
 
     // ---------------------------------------------------------------
@@ -458,6 +487,38 @@ service cloud.firestore {
           && request.resource.data.keys().hasOnly(['uid', 'ts']);
       allow update: if false;
       allow delete: if request.auth != null && resource.data.uid == request.auth.uid;
+    }
+
+    // ---------------------------------------------------------------
+    // 27d. LOREVIA VERSE: LANGGANAN CHAT & CALL (Rp10.000 / 30 hari; nama + jumlah bayar bisa dibaca publik untuk Billboard)
+    // ---------------------------------------------------------------
+    match /verseSubs/{id} {
+      allow get, list: if true;
+      allow create: if okSubDoc(id) && body().n == 1 && body().end <= nowMs() + 2678400000 + 120000;
+      allow update: if okSubDoc(id) && resource.data.uid == request.auth.uid && body().n == resource.data.n + 1
+          && body().end <= (resource.data.end > nowMs() ? resource.data.end : nowMs()) + 2678400000 + 120000;
+      allow delete: if false;
+    }
+
+    // ---------------------------------------------------------------
+    // 27e. LOREVIA VERSE: PESAN CHAT (hanya penggemar bersangkutan & artisnya; penggemar wajib langganan aktif)
+    // ---------------------------------------------------------------
+    match /verseMsgs/{id} {
+      allow get, list: if request.auth != null && (resource.data.fanUid == request.auth.uid || isStaffFor(resource.data.artistId));
+      allow create: if okMsg();
+      allow update: if false;
+      allow delete: if request.auth != null && resource.data.uid == request.auth.uid;
+    }
+
+    // ---------------------------------------------------------------
+    // 27f. LOREVIA VERSE: PANGGILAN SUARA (sinyal WebRTC; hanya penggemar & artis terkait)
+    // ---------------------------------------------------------------
+    match /verseCalls/{id} {
+      allow get, list: if callParty(resource.data);
+      allow create: if request.auth != null && okCallDoc(id) && request.resource.data.fanUid == request.auth.uid && body().state == 'ringing' && subActive(id);
+      allow update: if callParty(resource.data) && okCallDoc(id) && body().fanUid == resource.data.fanUid && body().artistId == resource.data.artistId
+          && (body().state != 'ringing' || (request.auth.uid == resource.data.fanUid && subActive(id)));
+      allow delete: if callParty(resource.data);
     }
 
     // ---------------------------------------------------------------
