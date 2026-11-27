@@ -205,7 +205,7 @@
             promos: [],
             videoPlaylists: [],
             audioPlaylists: [],
-            verseGroups: [], verseArtists: [], versePosts: [], verseStories: [], verseUnlocks: [], verseEvents: []
+            verseGroups: [], verseArtists: [], versePosts: [], verseStories: [], verseUnlocks: [], verseEvents: [], verseBanners: []
         };
 
 
@@ -260,7 +260,7 @@
                     m.genId = g.id;
                 }
             });
-            ['verseGroups', 'verseArtists', 'versePosts', 'verseStories', 'verseUnlocks', 'verseEvents'].forEach(k => { if (!Array.isArray(appData[k])) appData[k] = []; });
+            ['verseGroups', 'verseArtists', 'versePosts', 'verseStories', 'verseUnlocks', 'verseEvents', 'verseBanners'].forEach(k => { if (!Array.isArray(appData[k])) appData[k] = []; });
             appData.versePosts.forEach(v => { if (typeof v.likes !== 'number') v.likes = 0; v._liked = !!likedSet['vp_' + v.id]; });
             if (!appData.cooperations) appData.cooperations = [];
             if (!appData.products) appData.products = [];
@@ -301,7 +301,7 @@
     const ARRAY_KEYS = [
         'announcements', 'achievements', 'adminStructure', 'members', 'generations', 'guestBoxes', 'products', 'orders',
         'promos', 'videoPlaylists', 'audioPlaylists', 'videos', 'audios', 'histories', 'cooperations', 'dispatches', 'medparts',
-        'verseGroups', 'verseArtists', 'versePosts', 'verseStories', 'verseUnlocks', 'verseEvents'
+        'verseGroups', 'verseArtists', 'versePosts', 'verseStories', 'verseUnlocks', 'verseEvents', 'verseBanners'
     ];
     // Pengaturan umum, disimpan di satu dokumen settings/main.
     const SETTING_KEYS = [];
@@ -311,7 +311,7 @@
     const PAGE_ONLY = {
         orders: ['admin-dashboard'],
         verseGroups: ['verse', 'admin-dashboard'], verseArtists: ['verse', 'admin-dashboard'], versePosts: ['verse', 'admin-dashboard'],
-        verseStories: ['verse', 'admin-dashboard'], verseUnlocks: ['verse', 'admin-dashboard'], verseEvents: ['verse', 'admin-dashboard']
+        verseStories: ['verse', 'admin-dashboard'], verseUnlocks: ['verse', 'admin-dashboard'], verseEvents: ['verse', 'admin-dashboard'], verseBanners: ['verse', 'admin-dashboard']
     };
 
     const MAX_DATA_URI = 850000;   // data-URI di atas ini (karakter) tidak ikut disimpan ke Firestore (batas dokumen 1 MiB)
@@ -673,6 +673,7 @@
             }
         },
         async signOut() { await authInit(); await authMod.signOut(auth); },
+        async idToken() { await authInit(); const u = auth.currentUser; if (!u) throw new Error('Belum masuk'); return u.getIdToken(); },
         // Akun artis: username + sandi (dipetakan ke email internal username@artist.lorevia.app; perlu Email/Password aktif di Firebase)
         emailFor(username) { return String(username || '').trim().toLowerCase() + '@' + window.LV_ARTIST_DOMAIN; },
         async signInPassword(username, password) {
@@ -2901,12 +2902,12 @@ function openCropper(file, opts) {
 // Dasbor admin: Lorevia Verse (grup, akun artis + akses masuk, postingan grup, store artis, pembayaran konten eksklusif).
 ADMIN_LISTS.vgroup = 'verseGroups'; ADMIN_LISTS.vartist = 'verseArtists'; ADMIN_LISTS.vevent = 'verseEvents';
 let verseSec = 'group', verseAdminGroup = '';
-const VERSE_SECS = [['group', 'Akun Grup'], ['artist', 'Akun Artis'], ['post', 'Postingan Grup'], ['store', 'Store Grup'], ['event', 'Vote Event'], ['pay', 'Pembayaran Eksklusif'], ['subs', 'Langganan Chat']];
+const VERSE_SECS = [['group', 'Akun Grup'], ['artist', 'Akun Artis'], ['post', 'Postingan Grup'], ['store', 'Store Grup'], ['event', 'Vote Event'], ['pay', 'Pembayaran Eksklusif'], ['subs', 'Langganan Chat'], ['banner', 'Banner Iklan']];
 function setVerseSec(s) { verseSec = s; renderView(); }
 
 function renderVerseTab() {
     const nav = `<div class="flex flex-wrap gap-2">${VERSE_SECS.map(([k, l]) => `<button type="button" onclick="setVerseSec('${k}')" class="px-3 py-1.5 rounded-lg text-xs font-semibold ${verseSec === k ? 'bg-gold-600 text-black' : 'bg-forest-800 text-gray-300 border border-forest-700'}">${l}</button>`).join('')}</div>`;
-    const body = verseSec === 'artist' ? renderVArtistSec() : verseSec === 'post' ? renderVPostSec() : verseSec === 'store' ? renderVStoreSec() : verseSec === 'pay' ? renderVPaySec() : verseSec === 'subs' ? renderVSubsSec() : verseSec === 'event' ? renderVEventSec() : renderVGroupSec();
+    const body = verseSec === 'artist' ? renderVArtistSec() : verseSec === 'post' ? renderVPostSec() : verseSec === 'store' ? renderVStoreSec() : verseSec === 'pay' ? renderVPaySec() : verseSec === 'subs' ? renderVSubsSec() : verseSec === 'banner' ? renderVBannerSec() : verseSec === 'event' ? renderVEventSec() : renderVGroupSec();
     return `<div class="space-y-5">${nav}${body}</div>`;
 }
 
@@ -3149,11 +3150,42 @@ function renderVSubsSec() {
     if (vsubRows === null) { vsubRows = []; window.loreviaDoc.recent('verseSubs', 300).then(r => { vsubRows = r; renderView(); }).catch(() => { vsubRows = []; }); }
     const now = Date.now(), act = vsubRows.filter(r => r.end > now).length, pays = vsubRows.reduce((s, r) => s + (r.n || 0), 0);
     return cardBox(`<h4 class="font-serif text-lg font-bold text-gold-400">Langganan chat &amp; call</h4>
-        <p class="text-[11px] text-gray-400">Penggemar membayar Rp10.000 / 30 hari lewat QRIS dinamis (masuk ke QRIS Store) dan langganan aktif otomatis tanpa persetujuan tim. Daftar ini hanya untuk memantau &mdash; cocokkan dengan mutasi DANA/QRIS Store Anda.</p>
+        <p class="text-[11px] text-gray-400">Penggemar membayar Rp10.000 / 30 hari lewat QRIS dinamis. Pembayaran dideteksi otomatis oleh server (webhook Midtrans) dan langganan aktif tanpa persetujuan tim &mdash; tidak ada tombol &quot;sudah bayar&quot;. Daftar ini hanya untuk memantau.</p>
         <div class="grid grid-cols-3 gap-2 text-center"><div class="bg-forest-900/80 p-3 rounded-xl border border-forest-700"><b class="text-gold-400 text-lg">${vsubRows.length}</b><p class="text-[10px] text-gray-400">Pelanggan</p></div><div class="bg-forest-900/80 p-3 rounded-xl border border-forest-700"><b class="text-gold-400 text-lg">${act}</b><p class="text-[10px] text-gray-400">Aktif</p></div><div class="bg-forest-900/80 p-3 rounded-xl border border-forest-700"><b class="text-gold-400 text-lg">Rp${(pays * 10000).toLocaleString('id-ID')}</b><p class="text-[10px] text-gray-400">Total pembayaran</p></div></div>
         ${listBox(vsubRows.map(r => { const a = (appData.verseArtists || []).find(x => x.id === r.artistId); return `<div class="bg-forest-900/80 p-3 rounded-xl border border-forest-700 flex justify-between items-center gap-3 text-sm"><div class="min-w-0"><p class="font-bold text-gold-400 truncate">${escHtml(r.name || 'Penggemar')} &rarr; ${escHtml(a ? a.name : r.artistId)}</p><p class="text-[11px] text-gray-400">${r.n}&times; bayar &middot; aktif sampai ${new Date(r.end).toLocaleDateString('id-ID')} ${r.end > now ? '' : '(berakhir)'}</p></div></div>`; }).join(''))}
         <button type="button" class="${A_BTN}" onclick="vsubRows = null; renderView()">Muat ulang</button>`);
 }
+
+// ---- Banner iklan (landscape, tampil di beranda Verse & bergeser otomatis) ----
+function renderVBannerSec() {
+    const list = (appData.verseBanners || []).slice().sort((a, b) => (a.order || 0) - (b.order || 0) || (a.ts || 0) - (b.ts || 0));
+    return cardBox(`<h4 class="font-serif text-lg font-bold text-gold-400">Banner iklan beranda</h4>
+        <p class="text-[11px] text-gray-400">Foto <b>landscape</b> (disarankan 1200&times;500 px, rasio 12:5). Foto otomatis dipotong &amp; diperkecil. Banner tampil di bagian atas Beranda Lorevia Verse dan bergeser otomatis tiap beberapa detik.</p>
+        <form onsubmit="saveVBanner(event)" class="space-y-3">
+            <div><label class="${A_LBL}">Foto banner (landscape)</label><input type="file" accept="image/*" id="vbImg" required class="${A_FILE}"></div>
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3"><div><label class="${A_LBL}">Judul (opsional)</label><input id="vbTitle" maxlength="80" class="${A_INP}" placeholder="mis. Album baru rilis!"></div>
+            <div><label class="${A_LBL}">Link tujuan (opsional)</label><input id="vbLink" maxlength="300" class="${A_INP}" placeholder="https://..."></div></div>
+            <button type="submit" class="${A_BTN}">Tambah Banner</button></form>
+        ${list.length ? listBox(list.map((b, n) => { const i = appData.verseBanners.indexOf(b); return `<div class="bg-forest-900/80 p-3 rounded-xl border border-forest-700 space-y-2"><img src="${escHtml(b.img)}" class="w-full rounded-lg object-cover" style="aspect-ratio:12/5"><div class="flex items-center justify-between gap-2 text-xs"><span class="text-gray-300 truncate">${escHtml(b.title || '(tanpa judul)')}${b.on === false ? ' &middot; <b class="text-red-400">NONAKTIF</b>' : ''}</span><span class="flex gap-1 shrink-0"><button type="button" class="px-2 py-1 rounded bg-forest-800 border border-forest-700" onclick="moveVBanner(${i},-1)">&uarr;</button><button type="button" class="px-2 py-1 rounded bg-forest-800 border border-forest-700" onclick="moveVBanner(${i},1)">&darr;</button><button type="button" class="px-2 py-1 rounded bg-forest-800 border border-forest-700" onclick="toggleVBanner(${i})">${b.on === false ? 'Aktifkan' : 'Nonaktifkan'}</button><button type="button" class="px-2 py-1 rounded bg-red-900/60 border border-red-700 text-red-200" onclick="deleteVBanner(${i})">Hapus</button></span></div></div>`; }).join('')) : '<p class="text-xs text-gray-400">Belum ada banner. Beranda menampilkan banner bawaan Lorevia.</p>'}`);
+}
+async function saveVBanner(e) {
+    e.preventDefault();
+    try {
+        const f = document.getElementById('vbImg').files[0]; if (!f) throw adminFail('Pilih foto banner.');
+        const img = await vsShrink(await vsReadFile(f), 1200, 500, .78);
+        const link = document.getElementById('vbLink').value.trim();
+        if (link && !/^https?:\/\//i.test(link)) throw adminFail('Link harus diawali http:// atau https://');
+        const arr = appData.verseBanners || (appData.verseBanners = []);
+        arr.push({ id: 'vb_' + Date.now().toString(36), img, title: document.getElementById('vbTitle').value.trim().slice(0, 80), link, on: true, order: arr.length, ts: Date.now() });
+        await commitAdminChange('Banner ditambahkan!');
+    } catch (err) { adminActionFailed(err); }
+}
+function moveVBanner(i, d) {
+    const arr = appData.verseBanners, sorted = arr.slice().sort((a, b) => (a.order || 0) - (b.order || 0) || (a.ts || 0) - (b.ts || 0)), k = sorted.indexOf(arr[i]), t = sorted[k + d]; if (!t) return;
+    sorted.forEach((b, n) => { b.order = n; }); const o = arr[i].order; arr[i].order = t.order; t.order = o; commitAdminChange('Urutan banner diubah.');
+}
+function toggleVBanner(i) { const b = appData.verseBanners[i]; if (!b) return; b.on = b.on === false; commitAdminChange(b.on ? 'Banner diaktifkan.' : 'Banner dinonaktifkan.'); }
+function deleteVBanner(i) { if (!confirm('Hapus banner ini?')) return; appData.verseBanners.splice(i, 1); commitAdminChange('Banner dihapus.'); }
 
 
 /* ################ Banner musik ################ */
@@ -4448,24 +4480,16 @@ function vsWelcome() {
 
 // ---------- Profil pengguna, ikuti, gambar ----------
 function vsProf() { return VAUTH.profile || {}; }
-function vsUnf() { return vsProf().unfollow || []; }
-function vsFollowing(id) { return vsUnf().indexOf(id) < 0; }
 function vsMyPhoto() { return vsProf().photo || (VAUTH.user && VAUTH.user.photo) || ''; }
 async function vsSaveProf(patch) {
     const u = VAUTH.user; if (!u) throw new Error('Belum masuk');
-    const p = Object.assign({ unfollow: [], joined: Date.now() }, VAUTH.profile || {}, patch, { uid: u.uid, ts: Date.now() });
+    const p = Object.assign({ unfollow: [], follow: [], joined: Date.now() }, VAUTH.profile || {}, patch, { uid: u.uid, ts: Date.now() });
     await window.loreviaDoc.set('verseProfiles', u.uid, p); VAUTH.profile = p; return p;
-}
-async function vsToggleFollow(id) {
-    if (!VAUTH.user) { alert('Masuk dengan Google dulu.'); return; }
-    const list = vsUnf().slice(), i = list.indexOf(id); if (i < 0) list.push(id); else list.splice(i, 1);
-    try { await vsSaveProf({ unfollow: list.slice(0, 290) }); renderView(); if (document.querySelector('#vsModal.open .vs-flist')) vsFollowSheet(); } catch (e) { alert('Gagal menyimpan: ' + vsAuthErr(e)); }
 }
 function vsFollowBtn(id, big) {
     const f = vsFollowing(id);
     return `<button type="button" class="vs-fol ${f ? 'on' : ''} ${big ? 'big' : ''}" onclick="vsToggleFollow('${id}')">${f ? 'Mengikuti' : 'Ikuti'}</button>`;
 }
-function vsFollowCount() { return (appData.verseGroups || []).concat(appData.verseArtists || []).filter(x => vsFollowing(x.id)).length; }
 function vsReadFile(f) { return new Promise((res, rej) => { const r = new FileReader(); r.onload = () => res(r.result); r.onerror = () => rej(new Error('Gagal membaca file')); r.readAsDataURL(f); }); }
 function vsShrink(src, w, h, q) {
     return new Promise((res, rej) => {
@@ -4961,18 +4985,6 @@ function vsSpInput(v) {
         });
     }, 450);
 }
-function vsComposeRender() {
-    const groups = appData.verseGroups || [];
-    if (!VSP.groupId || !vsGroup(VSP.groupId)) VSP.groupId = groups[0] ? groups[0].id : '';
-    vsModal(`<div class="vs-cp-h"><button type="button" class="vs-x" onclick="vsModalClose()">&times;</button><b>Postingan baru</b><button type="button" class="vs-btn sm" id="vpGo" onclick="vsPostFan()">Terbitkan</button></div>
-        <div class="vs-cp-u">${vsAv(vsMyPhoto(), vsFanName(), 'sm')}<div><b>${escHtml(vsFanName())}</b>${groups.length ? `<select onchange="VSP.groupId=this.value">${groups.map(g => `<option value="${g.id}" ${VSP.groupId === g.id ? 'selected' : ''}>${escHtml(g.name)}</option>`).join('')}</select>` : ''}</div></div>
-        <textarea id="vpText" rows="4" maxlength="2000" placeholder="Bagikan sesuatu dengan komunitas…" oninput="VSP.text=this.value">${escHtml(VSP.text)}</textarea>
-        <div class="vc-photos">${VSP.photos.map((p, i) => `<div class="vc-ph"><img src="${p}" alt=""><button type="button" class="x" onclick="vpRemove(${i})">&times;</button></div>`).join('')}
-            ${VSP.photos.length < VS_FAN_PHOTOS ? `<label class="vc-add">${VS_ICON.cam}<input type="file" accept="image/*" multiple hidden onchange="vpPick(this)"></label>` : ''}</div>
-        <small class="vs-mut">${VSP.photos.length}/${VS_FAN_PHOTOS} foto</small>
-        <div class="vs-form" style="margin-top:8px"><input id="vpUrl" placeholder="Link Spotify (opsional)" value="${escHtml(VSP.url)}" oninput="vsSpInput(this.value)"></div>
-        <div id="vpSp" style="margin-top:6px">${vsSpFormHtml()}</div>`, 'cp');
-}
 async function vpPick(input) {
     const files = [...input.files]; input.value = '';
     for (const f of files) {
@@ -4982,24 +4994,6 @@ async function vpPick(input) {
     vsComposeRender();
 }
 function vpRemove(i) { VSP.photos.splice(i, 1); vsComposeRender(); }
-async function vsPostFan() {
-    const u = VAUTH.user; if (!u || VSP.busy) return;
-    const text = VSP.text.trim(), sp = VSP.sp;
-    if (VSP.url.trim() && !sp) { alert('Link Spotify tidak dikenali. Hapus atau perbaiki linknya.'); return; }
-    if (!text && !VSP.photos.length && !sp) { alert('Isi postingan dulu: teks, foto, atau musik.'); return; }
-    VSP.busy = true; const go = $id('vpGo'); if (go) { go.disabled = true; go.textContent = 'Mengirim…'; }
-    try {
-        const doc = { uid: u.uid, name: vsFanName().slice(0, 60) || 'Penggemar', av: (vsProf().av || ''), groupId: VSP.groupId || '', text: text.slice(0, 2000), photos: VSP.photos.slice(0, VS_FAN_PHOTOS), likes: 0, ts: Date.now() };
-        if (sp) doc.spotify = { type: sp.type, id: sp.id, url: sp.url, title: String(sp.title || '').slice(0, 200), artist: String(sp.artist || '').slice(0, 200), cover: String(sp.cover || '').slice(0, 300) };
-        const id = 'fp_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
-        await window.loreviaDoc.set('verseFanPosts', id, doc);
-        VSF.posts = [Object.assign({}, doc, { id, _id: id, fan: true, _liked: false })].concat(VSF.posts || []);
-        if (sp) VS.autoPid = id;
-        VSP.text = ''; VSP.photos = []; VSP.url = ''; VSP.sp = null; VSP.spState = '';
-        vsModalClose(); VS.tab = 'home'; VS.feed = 'foryou'; renderView(); vsScrollTop();
-    } catch (e) { alert('Postingan gagal dikirim: ' + vsAuthErr(e)); }
-    VSP.busy = false; const g2 = $id('vpGo'); if (g2) { g2.disabled = false; g2.textContent = 'Terbitkan'; }
-}
 
 // ---------- Edit profil penggemar (foto, sampul, nama, bio) ----------
 function vsEditProfile() {
@@ -5093,50 +5087,13 @@ function vsStoryRow() {
     const artists = (appData.verseArtists || []).filter(a => vsFollowing(a.id)).sort((a, b) => vsStoriesOf(b.id).length - vsStoriesOf(a.id).length);
     return `<div class="vs-row vs-stories"><button type="button" class="vs-circle on" onclick="vsTab('artists')"><span class="vs-av lg bub star">${VS_ICON.star}</span><span>Semua</span></button>${artists.map(vsArtistCircle).join('')}</div>`;
 }
-function vsBanners() {
-    const ev = vsActiveEvent(), out = [];
-    if (ev) out.push(`<button type="button" class="vs-banner ev" onclick="vsTab('vote')"><small>VOTE EVENT</small><b>${escHtml(ev.title)}</b><span>Pilih artis favoritmu</span><i>${VS_ICON.chev}</i></button>`);
-    (appData.verseGroups || []).filter(g => vsFollowing(g.id)).forEach(g => out.push(`<button type="button" class="vs-banner" ${g.banner ? `style="background-image:linear-gradient(180deg,rgba(150,60,170,.15),rgba(150,40,140,.7)),url('${escHtml(g.banner)}')"` : ''} onclick="vsOpenGroup('${g.id}')"><small>KOMUNITAS</small><b>${escHtml(g.name)}</b><span>${escHtml((g.bio || 'Selamat datang di komunitas resmi!').slice(0, 70))}</span><i>${VS_ICON.chev}</i></button>`));
-    return out.length ? `<div class="vs-banners">${out.join('')}</div>` : '';
-}
-function vsFeedTabs() {
-    const t = (k, l) => `<button type="button" class="${VS.feed === k ? 'on' : ''}" onclick="vsFeed('${k}')">${l}</button>`;
-    return `<div class="vs-tabs2">${t('foryou', 'Untuk Kamu')}${t('artist', 'Artis')}${t('fans', 'Fans')}${t('media', 'Media')}</div>`;
-}
 function vsAllPosts() { return (appData.versePosts || []).concat(VSF.posts || []).sort((a, b) => (b.ts || 0) - (a.ts || 0)); }
-function vsPostVisible(p) {
-    if (p.fan) return !p.groupId || vsFollowing(p.groupId);
-    return vsFollowing(p.authorId);
-}
-function vsFeedPosts() {
-    let l = vsAllPosts().filter(vsPostVisible);
-    if (VS.feed === 'artist') l = l.filter(p => !p.fan);
-    else if (VS.feed === 'fans') l = l.filter(p => p.fan);
-    else if (VS.feed === 'media') l = l.filter(p => !vsLocked(p) && (p.spotify || (p.photos && p.photos.length) || p.audio));
-    return l;
-}
-function vsHomeHtml() {
-    if (!(appData.verseGroups || []).length) return `<p class="vs-empty">Belum ada akun grup. Admin dapat menambahkannya di Dasbor Admin &rarr; Lorevia Verse.</p>`;
-    if (VSF.posts === null) vsLoadFan();
-    const posts = vsFeedPosts();
-    const empty = VS.feed === 'fans' ? 'Belum ada postingan dari penggemar. Ketuk tombol + untuk jadi yang pertama!' : 'Belum ada postingan.';
-    return `${vsStoryRow()}${vsBanners()}${vsFeedTabs()}${posts.length ? posts.map(vsPostHtml).join('') : `<p class="vs-empty">${empty}</p>`}`;
-}
 // ---------- Musik: pemutar kaca + daftar lagu dari postingan Spotify ----------
 function vsSubHead(title, back) {
     return `<div class="vs-sh"><button type="button" class="vs-round bub" data-drag onclick="${back || "vsTab('artists')"}" aria-label="Kembali">${VS_ICON.back}</button><h2>${title}</h2><span></span></div>`;
 }
 
 // ---------- Komunitas & artis ----------
-function vsCommunityHtml(g) {
-    const artists = (appData.verseArtists || []).filter(a => a.groupId === g.id);
-    const posts = vsAllPosts().filter(p => (p.fan && p.groupId === g.id) || (!p.fan && (p.groupId === g.id || (p.authorType === 'group' && p.authorId === g.id) || artists.some(a => a.id === p.authorId))));
-    return `${vsSubHead(escHtml(g.name))}
-        <section class="vs-hero vs-glass"><div class="vs-cover" ${g.banner ? `style="background-image:url('${escHtml(g.banner)}')"` : ''}></div><div class="vs-hero-in">${vsAv(g.photo, g.name, 'xl')}<h2>${escHtml(g.name)}</h2><p>${escHtml(g.bio || '')}</p><small>${artists.length} artis · ${posts.length} postingan</small>
-        <div class="vs-hero-act">${vsFollowBtn(g.id, true)}<button type="button" class="vs-btn ghost" onclick="VS.letterTo='${g.id}'; vsTab('letter')">Kirim surat</button></div></div></section>
-        ${artists.length ? `<h4 class="vs-h">Artis</h4><div class="vs-row">${artists.map(vsArtistCircle).join('')}</div>` : ''}
-        <h4 class="vs-h">Postingan</h4>${posts.length ? posts.map(vsPostHtml).join('') : '<p class="vs-empty">Belum ada postingan.</p>'}`;
-}
 function vsArtistHtml(a) {
     vsLoadSubs();
     const g = vsGroup(a.groupId), sc = vsScoreOf(a), rank = vsArtistRank(a.id), lv = vsArtistLv(a.id), sub = vsMySub(a.id), on = !!(sub && sub.end > Date.now());
@@ -5362,7 +5319,6 @@ function vsSettingsHtml() {
         <section class="vs-glass vs-slist">${st ? row('me', 'Akun', sub, "VS.stab='sec'; vsTab('me')") : row('me', 'Akun', sub, 'vsEditProfile()')}${row('bell', 'Notifikasi', '', "vsTab('notif')")}${row('lock', 'Privasi', '', 'vsPrivacy()')}
         <label class="vs-srow"><span>${VS_ICON.globe}</span><b>Bahasa terjemahan</b><select onchange="vsSetLang(this.value)">${Object.keys(VS_LANGS).map(k => `<option value="${k}" ${vsLang() === k ? 'selected' : ''}>${VS_LANGS[k]}</option>`).join('')}</select></label>
         ${row('chat', 'Chat Idol & langganan', '', "vsTab('chats')")}${row('star', 'Billboard & lencana', '', "vsTab('board')")}
-        <label class="vs-srow"><span>${VS_ICON.note}</span><b>Animasi musik</b><select onchange="vsSetManim(this.value)"><option value="vinyl" ${vsManim() === 'vinyl' ? 'selected' : ''}>Vinyl</option><option value="wave" ${vsManim() === 'wave' ? 'selected' : ''}>Gelombang</option></select></label>
         <label class="vs-srow"><span>${VS_ICON.play}</span><b>Putar musik otomatis</b><select onchange="vsSetAuto(this.value==='1')"><option value="1" ${vsAutoPlayOn() ? 'selected' : ''}>Aktif</option><option value="0" ${vsAutoPlayOn() ? '' : 'selected'}>Mati</option></select></label>
         ${row('star', 'Tampilan', 'Pink Mode')}${row('bag', 'Data & Penyimpanan', '', 'vsClearCache()')}${!st && u ? row('lock', 'Atur ulang sandi', '', 'vsResetPwSheet()') : ''}${row('info', 'Pusat Bantuan', '', 'vsHelp()')}${row('info', 'Tentang Lorevia Verse', '', 'vsAbout()')}</section>
         ${u ? `<button type="button" class="vs-logout wide" onclick="vsLogout()">Keluar</button>` : ''}`;
@@ -5440,42 +5396,6 @@ async function vsDoResetPw() {
     const n = $id('rpNew').value; if (n.length < 6) { alert('Sandi minimal 6 karakter.'); return; }
     try { const salt = Array.from(crypto.getRandomValues(new Uint8Array(12))).map(b => b.toString(16).padStart(2, '0')).join(''); await vsSaveProf({ ph: await vsHashPw(n, salt), ps: salt }); vsModalClose(); alert('Sandi baru tersimpan.'); }
     catch (e) { alert('Gagal: ' + vsAuthErr(e)); }
-}
-function renderView_verse() {
-    const content = $id('appContent');
-    if (currentRoute !== 'toko') stopPromoBanner();
-    if (currentRoute !== 'verse') return;
-    vsAuthStart();
-    if (VS.tab !== 'chat' && !(VS.tab === 'me' && VSM.fan)) vsChatStop();
-    if (vsSession()) vsCallWatch();
-    if (VSB.all === null && !VSB.loading && vsCanView()) vsLoadSubs();
-    if (VS.loginSlug && vsStaff()) {
-        VS.loginSlug = ''; VS.tab = 'me';
-        try { history.replaceState(null, '', (location.pathname.replace(/\/[^\/]*login\/?$/, '/') || '/') + '?p=verse'); } catch (e) {}
-    }
-    const splash = vsNeedReg() ? vsRegHtml() : ((VS.loginSlug || !vsCanView()) ? vsSplashHtml() : '');
-    const keep = document.querySelector('.vs'), st = keep ? keep.scrollTop : 0;
-    if (splash) { content.innerHTML = `<div class="vs splash"><div class="vs-bg"><i></i><i></i><i></i></div>${splash}</div>`; vsBubbles(); return; }
-    if (VAUTH.user && VSF.posts === null) vsLoadFan();
-    const staff = !!(vsSession() || vsGroupSession());
-    let body;
-    if (VS.artistId && vsArtist(VS.artistId)) body = vsArtistHtml(vsArtist(VS.artistId));
-    else body = VS.tab === 'artists' ? vsArtistsHtml() : VS.tab === 'music' ? vsMusicHtml() : VS.tab === 'board' ? vsBoardHtml() : VS.tab === 'chats' ? vsChatsHtml() : VS.tab === 'chat' ? vsChatHtml() : VS.tab === 'vote' ? vsVoteHtml() : VS.tab === 'store' ? vsStoreHtml()
-        : VS.tab === 'letter' ? vsLetterHtml() : VS.tab === 'me' ? vsMeHtml() : VS.tab === 'notif' ? vsNotifHtml() : VS.tab === 'settings' ? vsSettingsHtml()
-        : (VS.tab === 'community' && vsGroup(VS.groupId)) ? vsCommunityHtml(vsGroup(VS.groupId)) : vsHomeHtml();
-    const showTop = !!VS.artistId || VS.tab === 'home' || (VS.tab === 'me' && (staff || !VAUTH.user));
-    const navOn = VS.artistId ? 'artists' : ({ home: 'home', music: 'home', board: 'artists', chats: 'artists', chat: 'artists', artists: 'artists', community: 'artists', store: 'artists', letter: 'artists', vote: 'artists', notif: 'notif', me: 'me', settings: 'me' }[VS.tab] || 'home');
-    const unread = vsUnread();
-    const nb = (t, ico, label, cls, fn) => `<button type="button" class="bub ${cls || ''} ${navOn === t ? 'on' : ''}" data-drag onclick="${fn || `vsTab('${t}')`}" aria-label="${label || 'Posting'}">${VS_ICON[ico]}${label ? `<span>${label}</span>` : ''}${t === 'notif' && unread ? '<i class="vs-dot"></i>' : ''}</button>`;
-    content.innerHTML = `<div class="vs"><div class="vs-bg"><i></i><i></i><i></i></div>
-        ${showTop ? `<div class="vs-top"><button type="button" class="vs-round bub" data-drag onclick="navigate('beranda')" aria-label="Kembali ke situs">${VS_ICON.back}</button>
-            <div class="vs-brand"><span>${LOGO_VERSE}</span><b>Lorevia Verse</b></div>
-            <div class="vs-top-r"><button type="button" class="vs-round bub" data-drag onclick="vsTab('artists'); setTimeout(function(){var q=document.getElementById('vsQ'); q && q.focus();}, 60)" aria-label="Cari">${VS_ICON.search}</button>
-            <button type="button" class="vs-round bub" data-drag onclick="vsTab('notif')" aria-label="Notifikasi">${VS_ICON.bell}${unread ? '<i class="vs-dot"></i>' : ''}</button></div></div>` : ''}
-        <main class="vs-main ${showTop ? '' : 'notop'}">${body}</main>
-        <nav class="vs-nav">${nb('home', 'home', 'Home')}${nb('artists', 'search', 'Discover')}${nb('compose', 'plus', '', 'center plus', 'vsOpenCompose()')}${nb('notif', 'bell', 'Notifikasi')}${nb('me', 'me', 'My')}</nav></div>`;
-    const el = document.querySelector('.vs'); if (el && st) el.scrollTop = st;
-    vsBubbles();
 }
 function vsBubbles() { if (window.bubbleScan) window.bubbleScan(); vsSpFill(); vsMcInit(); }
 function openProfil() { VS.tab = 'me'; VS.artistId = null; if (window.PAGE_ROUTE === 'verse' || currentRoute === 'verse') renderView(); else navigate('verse'); }
@@ -5610,49 +5530,6 @@ function vsSubActive(aid) { const s = vsMySub(aid); return !!(s && s.end > Date.
 function vsMyLv() { return VAUTH.user ? vsUidLv(VAUTH.user.uid) : 0; }
 function vsDate(ts) { const d = new Date(ts); return d.toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' }); }
 // ---------- pembayaran QRIS dinamis ----------
-const VSQ = { aid: '', t0: 0, exp: 0, timer: null, busy: false };
-function vsSubOpen(aid) {
-    if (!VAUTH.user) { alert('Masuk dengan akun penggemar dulu untuk berlangganan.'); return; }
-    const a = vsArtist(aid); if (!a) return;
-    const payload = vsQrisDynamic(VS_SUB_PRICE), s = vsMySub(aid), ext = s && s.end > Date.now();
-    VSQ.aid = aid; VSQ.t0 = Date.now(); VSQ.exp = Date.now() + 15 * 60000; VSQ.busy = false;
-    vsModal(`<div class="vs-pay"><div class="vs-pay-h">${vsAv(a.photo, a.name, 'lg', vsArtistLv(a.id))}<div><small>${ext ? 'Perpanjang langganan' : 'Berlangganan'}</small><h3>${escHtml(a.name)}${VS_VF}</h3></div></div>
-        <ul class="vs-pay-ul"><li>Chat langsung dengan ${escHtml(a.name)}</li><li>Panggilan suara (call)</li><li>Badge api, TOP &amp; Avatar Border hutan seiring banyaknya langganan</li></ul>
-        <div class="vs-pay-amt"><span>Total</span><b>${vsRp(VS_SUB_PRICE)}</b><small>/ ${VS_SUB_DAYS} hari</small></div>
-        <div class="vs-qr"><div class="vs-qr-in">${LV_QR.svg(payload)}</div><div class="vs-qr-cap"><b>QRIS</b><span>Kedai Raveena · Lorevia Store</span></div></div>
-        <ol class="vs-pay-st"><li>Buka DANA / GoPay / OVO / ShopeePay / m-banking</li><li>Scan QRIS ini — nominal terisi otomatis <b>${vsRp(VS_SUB_PRICE)}</b></li><li>Setelah berhasil, tekan tombol di bawah</li></ol>
-        <div class="vs-pay-t">QR berlaku <b id="vsqT">15:00</b></div>
-        <button type="button" class="vs-pill" id="vsqGo" disabled onclick="vsSubConfirm()">Saya sudah bayar</button>
-        <button type="button" class="vs-link" onclick="vsSubClose()">Batal</button></div>`, 'wide');
-    clearInterval(VSQ.timer);
-    VSQ.timer = setInterval(() => {
-        const t = $id('vsqT'), b = $id('vsqGo'); if (!t || !b) { clearInterval(VSQ.timer); return; }
-        const left = Math.max(0, VSQ.exp - Date.now()), w = Math.max(0, 15 - Math.floor((Date.now() - VSQ.t0) / 1000));
-        t.textContent = String(Math.floor(left / 60000)).padStart(2, '0') + ':' + String(Math.floor(left / 1000) % 60).padStart(2, '0');
-        if (!VSQ.busy) { b.disabled = w > 0 || left <= 0; b.textContent = left <= 0 ? 'QR kedaluwarsa — buka ulang' : w > 0 ? 'Saya sudah bayar (' + w + ')' : 'Saya sudah bayar'; }
-    }, 500);
-}
-function vsSubClose() { clearInterval(VSQ.timer); vsModalClose(); }
-async function vsSubConfirm() {
-    if (VSQ.busy || !VAUTH.user) return; VSQ.busy = true;
-    const b = $id('vsqGo'); if (b) { b.disabled = true; b.textContent = 'Mengaktifkan…'; }
-    const aid = VSQ.aid, a = vsArtist(aid), u = VAUTH.user, id = u.uid + '_' + aid;
-    try {
-        let old = null; try { old = await window.loreviaDoc.get('verseSubs', id); } catch (e) {}
-        const now = Date.now(), base = old && old.end > now ? old.end : now;
-        const doc = { uid: u.uid, artistId: aid, groupId: a.groupId || '', name: vsFanName().slice(0, 60), amount: VS_SUB_PRICE, n: (old ? old.n || 0 : 0) + 1, first: old ? old.first || now : now, end: base + VS_SUB_MS, ts: now };
-        const av = vsProf().av; if (av && av.length <= 14000) doc.av = av;
-        await window.loreviaDoc.set('verseSubs', id, doc);
-        doc._id = id; VSB.mine = (VSB.mine || []).filter(x => x.artistId !== aid).concat([doc]);
-        VSB.all = (VSB.all || []).filter(x => x._id !== id).concat([doc]); vsLoadSubsRecalc();
-        clearInterval(VSQ.timer);
-        vsModal(`<div class="vs-pay ok"><div class="vs-burst">${Array.from({ length: 14 }, (_, i) => `<i style="--a:${i * 25.7}deg;--d:${0.55 + (i % 4) * 0.12}s"></i>`).join('')}<span>${VS_ICON.check}</span></div><h3>Langganan aktif!</h3><p class="vs-mut">Chat &amp; call dengan <b>${escHtml(a.name)}</b> aktif sampai <b>${vsDate(doc.end)}</b>.</p>
-            ${vsLvLine()}<button type="button" class="vs-pill" onclick="vsModalClose(); vsOpenChat('${aid}')">Mulai chat</button><button type="button" class="vs-link" onclick="vsModalClose(); renderView()">Tutup</button></div>`);
-    } catch (e) {
-        VSQ.busy = false; const bb = $id('vsqGo'); if (bb) { bb.disabled = false; bb.textContent = 'Coba lagi'; }
-        alert('Gagal mengaktifkan langganan: ' + vsAuthErr(e) + '\nPastikan Rules Firestore terbaru sudah dipublikasikan.');
-    }
-}
 function vsLoadSubsRecalc() { const rows = VSB.all || []; VSB.all = null; VSB.loading = false; const keep = rows; VSB.all = keep; VSB.byUid = {}; VSB.byArtist = {};
     rows.forEach(r => { const u = VSB.byUid[r.uid] || (VSB.byUid[r.uid] = { n: 0, name: r.name, av: r.av || '', ts: 0 }); u.n += r.n || 0; const a = VSB.byArtist[r.artistId] || (VSB.byArtist[r.artistId] = { active: 0, total: 0, fans: [] }); a.total += r.n || 0; if ((r.end || 0) > Date.now()) a.active++; a.fans.push(r); }); }
 function vsLvLine() { const n = (VSB.byUid[VAUTH.user.uid] || {}).n || 0, lv = vsTier(n), nx = VS_TIERS.find(t => n < t.n); return `<div class="vs-lvline">${vsAv(vsMyPhoto(), vsFanName(), 'lg', lv)}<div><b>${lv ? 'Tier ' + VS_TIERS[lv - 1].name : 'Belum ada tier'} ${vsBadges(lv)}</b><small>${n} kali berlangganan${nx ? ' · ' + (nx.n - n) + ' lagi menuju ' + nx.name : ' · tier tertinggi!'}</small></div></div>`; }
@@ -5705,23 +5582,8 @@ function vsBadgeLegend() {
 // =====================================================================
 // Musik: kartu di bawah nama pengunggah (autoplay), dua gaya animasi: Vinyl & Gelombang
 // =====================================================================
-function vsManim() { try { return localStorage.getItem('lorevia_vs_manim') === 'wave' ? 'wave' : 'vinyl'; } catch (e) { return 'vinyl'; } }
-function vsSetManim(v) { try { localStorage.setItem('lorevia_vs_manim', v); } catch (e) {} renderView(); }
 function vsAutoPlayOn() { try { return localStorage.getItem('lorevia_vs_auto') !== '0'; } catch (e) { return true; } }
 function vsSetAuto(on) { try { localStorage.setItem('lorevia_vs_auto', on ? '1' : '0'); } catch (e) {} renderView(); }
-function vsArtHtml(cover) { return `<span class="vs-mc-art">${cover ? `<img src="${escHtml(cover)}" alt="">` : VS_ICON.note}</span>`; }
-function vsVinylHtml(cover) { return `<div class="vs-vin"><span class="vs-vin-disc"><i><b></b></i></span><span class="vs-vin-sl">${vsArtHtml(cover)}</span></div>`; }
-function vsWaveHtml(cover) { return `<div class="vs-wav"><span class="vs-wav-ring"></span>${vsArtHtml(cover)}<span class="vs-eq"><i></i><i></i><i></i><i></i><i></i></span></div>`; }
-function vsMusicCard(sp, pid, big) {
-    const k = sp.type + '_' + sp.id, c = VS_SPC[k] || {}, title = sp.title || c.title || '', artist = sp.artist || c.artist || '', cover = sp.cover || c.cover || '';
-    const h = (sp.type === 'track' || sp.type === 'episode') ? 152 : 352;
-    return `<div class="vs-mc ${vsManim()} ${big ? 'big' : ''}" data-pid="${escHtml(pid || '')}" data-uri="spotify:${escHtml(sp.type)}:${escHtml(sp.id)}" data-h="${h}" data-src="https://open.spotify.com/embed/${escHtml(sp.type)}/${escHtml(sp.id)}">
-        <div class="vs-mc-top">${vsManim() === 'vinyl' ? vsVinylHtml(cover) : vsWaveHtml(cover)}
-        <div class="vs-spm vs-mc-meta" data-k="${escHtml(k)}" data-t="${escHtml(sp.type)}" data-i="${escHtml(sp.id)}" data-u="${escHtml(sp.url)}" ${title ? 'data-done="1"' : ''}><small class="vs-mc-lbl">Sedang diputar</small><b>${escHtml(title || 'Musik di Spotify')}</b><small class="vs-mc-ar">${artist ? escHtml(artist) : (title ? '' : 'Mendeteksi judul & artis…')}</small></div>
-        <button type="button" class="vs-mc-play" onclick="vsMcToggle(this)" aria-label="Putar / jeda"><svg class="pl" viewBox="0 0 24 24" width="22" height="22"><path fill="currentColor" d="M8 5v14l11-7z"/></svg><svg class="pa" viewBox="0 0 24 24" width="22" height="22"><path fill="currentColor" d="M6 5h4v14H6zm8 0h4v14h-4z"/></svg></button></div>
-        <div class="vs-mc-host"></div></div>`;
-}
-function vsSpotifyHtml(sp) { return vsMusicCard(sp, ''); }   // dipakai tempat lain
 function vsSpApi(cb) {
     if (window.VS_IFAPI) return cb(window.VS_IFAPI);
     (window.__vsq = window.__vsq || []).push(cb);
@@ -5748,7 +5610,7 @@ function vsMcInit() {
             const host = el.querySelector('.vs-mc-host'); if (!host) return; const d = document.createElement('div'); host.appendChild(d);
             api.createController(d, { uri: el.dataset.uri, width: '100%', height: parseInt(el.dataset.h, 10) || 152 }, ctrl => {
                 el._c = ctrl;
-                ctrl.addListener('playback_update', e => { const on = !!e.data && !e.data.isPaused && !e.data.isBuffering || (!!e.data && !e.data.isPaused); el.classList.toggle('playing', on); if (on) { if (VS.curMc && VS.curMc !== el && VS.curMc._c) { try { VS.curMc._c.pause(); } catch (x) {} } VS.curMc = el; } });
+                ctrl.addListener('playback_update', e => { const on = !!e.data && !e.data.isPaused && !e.data.isBuffering || (!!e.data && !e.data.isPaused); el.classList.toggle('playing', on); if (on) { vsAudPause(); if (VS.curMc && VS.curMc !== el && VS.curMc._c) { try { VS.curMc._c.pause(); } catch (x) {} } VS.curMc = el; } });
                 if (vsMcObs) vsMcObs.observe(el);
                 if ((el.dataset.pid && el.dataset.pid === VS.autoPid) || el.dataset.auto) { VS.autoPid = ''; setTimeout(() => { try { ctrl.play(); } catch (x) {} }, 400); }
             });
@@ -5757,29 +5619,6 @@ function vsMcInit() {
 }
 function vsMcToggle(btn) { const el = btn.closest('.vs-mc'); if (el && el._c) { try { el._c.togglePlay(); } catch (e) {} } else if (el) { vsMcFallback(el); } }
 // ---------- halaman Lorevia Music (karusel piringan vinyl / gelombang) ----------
-function vsTracks() {
-    const out = [];
-    vsAllPosts().filter(p => p.spotify && !vsLocked(p)).forEach(p => {
-        const au = p.fan ? null : (p.authorType === 'artist' ? vsArtist(p.authorId) : vsGroup(p.authorId));
-        const k = p.spotify.type + '_' + p.spotify.id, c = VS_SPC[k] || {};
-        out.push({ pid: p.id, sp: p.spotify, title: p.spotify.title || c.title || '', artist: p.spotify.artist || c.artist || '', cover: p.spotify.cover || c.cover || '', by: p.fan ? p.name : (au ? au.name : 'Lorevia'), ts: p.ts });
-    });
-    return out;
-}
-function vsPlay(pid) { VS.np = pid; VS.musicAuto = true; renderView(); vsScrollTop(); }
-function vsMusicHtml() {
-    const tr = vsTracks(), cur = tr.find(t => t.pid === VS.np) || tr[0], m = vsManim();
-    const sw = `<div class="vs-pills mini"><button type="button" class="${m === 'vinyl' ? 'on' : ''}" onclick="vsSetManim('vinyl')">Vinyl</button><button type="button" class="${m === 'wave' ? 'on' : ''}" onclick="vsSetManim('wave')">Gelombang</button></div>`;
-    let body = '<p class="vs-empty">Belum ada musik yang dibagikan. Bagikan link Spotify lewat tombol + (penggemar) atau postingan artis.</p>';
-    if (cur) {
-        const auto = VS.musicAuto; VS.musicAuto = false;
-        const car = m === 'vinyl' ? `<div class="vs-vcar">${tr.map(t => `<button type="button" class="vs-vcard ${t.pid === cur.pid ? 'on' : ''}" onclick="vsPlay('${t.pid}')">${vsVinylHtml(t.cover)}</button>`).join('')}</div>` : '';
-        body = `${car}<section class="vs-player vs-glass"><h3 class="vs-pl-t">${escHtml(cur.title || 'Musik di Spotify')}</h3><p class="vs-pl-a">${escHtml(cur.artist || cur.by)}</p>
-            ${vsMusicCard(cur.sp, 'np_' + cur.pid, true).replace('class="vs-mc ', auto ? 'data-auto="1" class="vs-mc ' : 'class="vs-mc ')}<div class="vs-pl-by">Dibagikan oleh ${escHtml(cur.by)}</div><small class="vs-pl-brand">lorevia music</small></section>
-            <h4 class="vs-h">Daftar putar</h4><div class="vs-tl">${tr.map(t => `<button type="button" class="vs-trk ${t.pid === cur.pid ? 'on' : ''}" onclick="vsPlay('${t.pid}')"><span class="vs-spc">${t.cover ? `<img src="${escHtml(t.cover)}" alt="">` : VS_ICON.note}</span><div><b>${escHtml(t.title || 'Musik di Spotify')}</b><small>${escHtml(t.artist || t.by)}</small></div>${VS_ICON.play}</button>`).join('')}</div>`;
-    }
-    return vsSubHead('Lorevia Music') + sw + body;
-}
 
 // =====================================================================
 // Chat & call dengan artis (khusus pelanggan aktif); sisi artis ada di panel
@@ -5977,6 +5816,281 @@ function vsLoginAnim(name) {
     setTimeout(() => { d.classList.remove('on'); setTimeout(() => d.remove(), 450); }, 1700);
 }
 
+
+// =====================================================================
+// V6 — ikuti manual, beranda tanpa postingan fans, tab Fans, musik dari dashboard, pill Spotify,
+//      pembayaran otomatis (server), banner iklan, navigasi kaca 3D
+// =====================================================================
+// ---------- Ikuti: hanya yang dipilih sendiri (profil.follow) ----------
+function vsFol() { return vsProf().follow || []; }
+function vsFollowing(id) { return vsFol().indexOf(id) >= 0; }
+async function vsToggleFollow(id) {
+    if (!VAUTH.user) { alert('Masuk dengan Google dulu.'); return; }
+    const list = vsFol().slice(), i = list.indexOf(id); if (i < 0) list.push(id); else list.splice(i, 1);
+    try { await vsSaveProf({ follow: list.slice(0, 290) }); renderView(); if (document.querySelector('#vsModal.open .vs-flist')) vsFollowSheet(); } catch (e) { alert('Gagal menyimpan: ' + vsAuthErr(e)); }
+}
+function vsFollowCount() { return (appData.verseGroups || []).concat(appData.verseArtists || []).filter(x => vsFollowing(x.id)).length; }
+// ---------- Beranda: hanya postingan artis/grup yang diikuti. Postingan fans hanya di tab Fans ----------
+function vsPostVisible(p) {
+    if (p.fan) return false;
+    return vsFollowing(p.authorId) || (p.authorType === 'artist' && vsArtist(p.authorId) && vsFollowing((vsArtist(p.authorId) || {}).groupId));
+}
+function vsFeedPosts() {
+    const all = vsAllPosts().filter(p => !p.fan);
+    if (VS.feed === 'new') return all;
+    if (VS.feed === 'media') return all.filter(p => !vsLocked(p) && (p.spotify || (p.photos && p.photos.length) || p.audio));
+    return all.filter(vsPostVisible);
+}
+function vsFeedTabs() {
+    const t = (k, l) => `<button type="button" class="${VS.feed === k ? 'on' : ''}" onclick="vsFeed('${k}')">${l}</button>`;
+    return `<div class="vs-tabs2">${t('foryou', 'Untuk Kamu')}${t('new', 'Terbaru')}${t('media', 'Media')}</div>`;
+}
+// ---------- Banner iklan (landscape, geser otomatis) ----------
+function vsAds() { return (appData.verseBanners || []).filter(b => b && b.img && b.on !== false).sort((a, b) => (a.order || 0) - (b.order || 0) || (a.ts || 0) - (b.ts || 0)); }
+let vsAdTimer = null;
+function vsAdHtml() {
+    const ads = vsAds();
+    const slides = ads.length ? ads.map(b => `<a class="vs-ad-s" ${b.link ? `href="${escHtml(b.link)}" target="_blank" rel="noopener"` : ''}><img src="${escHtml(b.img)}" alt="${escHtml(b.title || 'Iklan')}" loading="lazy">${b.title ? `<span>${escHtml(b.title)}</span>` : ''}</a>`).join('')
+        : `<div class="vs-ad-s def"><b>Lorevia Verse</b><span>Ikuti artis favoritmu &middot; chat &amp; call &middot; musik Lorevia</span></div>`;
+    return `<section class="vs-ad"><div class="vs-ad-t" onscroll="vsAdScroll(this)">${slides}</div>${ads.length > 1 ? `<div class="vs-ad-d">${ads.map((_, i) => `<i class="${i ? '' : 'on'}"></i>`).join('')}</div>` : ''}</section>`;
+}
+function vsAdScroll(el) { const i = Math.round(el.scrollLeft / Math.max(1, el.clientWidth)), d = el.parentNode.querySelectorAll('.vs-ad-d i'); d.forEach((x, k) => x.classList.toggle('on', k === i)); }
+function vsAdStart() {
+    clearInterval(vsAdTimer); const t = document.querySelector('.vs-ad-t'); if (!t || t.children.length < 2) return;
+    vsAdTimer = setInterval(() => {
+        const el = document.querySelector('.vs-ad-t'); if (!el) { clearInterval(vsAdTimer); return; }
+        if (el.matches(':active') || el.dataset.hold) return;
+        const n = el.children.length, i = Math.round(el.scrollLeft / el.clientWidth);
+        el.scrollTo({ left: ((i + 1) % n) * el.clientWidth, behavior: 'smooth' });
+    }, 4200);
+}
+function vsBanners() {
+    const ev = vsActiveEvent();
+    return ev ? `<div class="vs-banners"><button type="button" class="vs-banner ev" onclick="vsTab('vote')"><small>VOTE EVENT</small><b>${escHtml(ev.title)}</b><span>Pilih artis favoritmu</span><i>${VS_ICON.chev}</i></button></div>` : '';
+}
+function vsQuick() {
+    const q = (t, ico, l) => `<button type="button" onclick="vsTab('${t}')"><span>${VS_ICON[ico]}</span><em>${l}</em></button>`;
+    return `<div class="vs-quick">${q('music', 'note', 'Musik')}${q('board', 'star', 'Billboard')}${q('store', 'bag', 'Store')}${q('vote', 'heart', 'Vote')}${q('letter', 'mail', 'Surat')}${q('chats', 'chat', 'Chat')}</div>`;
+}
+function vsHomeHtml() {
+    if (!(appData.verseGroups || []).length) return `<p class="vs-empty">Belum ada akun grup. Admin dapat menambahkannya di Dasbor Admin &rarr; Lorevia Verse.</p>`;
+    const posts = vsFeedPosts(), nf = vsFollowCount();
+    let empty = 'Belum ada postingan.';
+    if (VS.feed === 'foryou' && !nf) empty = 'Kamu belum mengikuti siapa pun. Buka <b>Discover</b> lalu pilih artis atau grup favoritmu.';
+    else if (VS.feed === 'foryou') empty = 'Belum ada postingan dari yang kamu ikuti. Lihat tab Terbaru.';
+    return `${vsAdHtml()}${vsQuick()}${vsStoryRow()}${vsBanners()}${vsFeedTabs()}${posts.length ? posts.map(vsPostHtml).join('') : `<div class="vs-empty">${empty}${VS.feed === 'foryou' && !nf ? '<br><button type="button" class="vs-btn" style="margin-top:10px" onclick="vsTab(\'artists\')">Cari artis &amp; grup</button>' : ''}</div>`}`;
+}
+function vsFansHtml() {
+    if (VSF.posts === null) vsLoadFan();
+    const posts = (VSF.posts || []).slice().sort((a, b) => (b.ts || 0) - (a.ts || 0));
+    return `<div class="vs-fanhead"><div><h2>Fans</h2><p>Ruang postingan para penggemar. Tidak masuk ke beranda maupun komunitas idol.</p></div><button type="button" class="vs-btn" onclick="vsOpenCompose()">+ Posting</button></div>
+        ${posts.length ? posts.map(vsPostHtml).join('') : `<p class="vs-empty">${VSF.posts === null ? 'Memuat…' : 'Belum ada postingan penggemar. Jadilah yang pertama!'}</p>`}`;
+}
+function vsCommunityHtml(g) {
+    const artists = (appData.verseArtists || []).filter(a => a.groupId === g.id);
+    const posts = vsAllPosts().filter(p => !p.fan && (p.groupId === g.id || (p.authorType === 'group' && p.authorId === g.id) || artists.some(a => a.id === p.authorId)));
+    return `${vsSubHead(escHtml(g.name))}
+        <section class="vs-hero vs-glass"><div class="vs-cover" ${g.banner ? `style="background-image:url('${escHtml(g.banner)}')"` : ''}></div><div class="vs-hero-in">${vsAv(g.photo, g.name, 'xl')}<h2>${escHtml(g.name)}</h2><p>${escHtml(g.bio || '')}</p><small>${artists.length} artis · ${posts.length} postingan</small>
+        <div class="vs-hero-act">${vsFollowBtn(g.id, true)}<button type="button" class="vs-btn ghost" onclick="VS.letterTo='${g.id}'; vsTab('letter')">Kirim surat</button></div></div></section>
+        ${artists.length ? `<h4 class="vs-h">Artis</h4><div class="vs-row">${artists.map(vsArtistCircle).join('')}</div>` : ''}
+        <h4 class="vs-h">Postingan</h4>${posts.length ? posts.map(vsPostHtml).join('') : '<p class="vs-empty">Belum ada postingan.</p>'}`;
+}
+// ---------- Menulis postingan fans: tidak terhubung ke komunitas mana pun ----------
+function vsComposeRender() {
+    vsModal(`<div class="vs-cp-h"><button type="button" class="vs-x" onclick="vsModalClose()">&times;</button><b>Postingan baru</b><button type="button" class="vs-btn sm" id="vpGo" onclick="vsPostFan()">Terbitkan</button></div>
+        <div class="vs-cp-u">${vsAv(vsMyPhoto(), vsFanName(), 'sm')}<div><b>${escHtml(vsFanName())}</b><small class="vs-mut">Tampil di tab Fans</small></div></div>
+        <textarea id="vpText" rows="4" maxlength="2000" placeholder="Bagikan sesuatu dengan sesama fans…" oninput="VSP.text=this.value">${escHtml(VSP.text)}</textarea>
+        <div class="vc-photos">${VSP.photos.map((p, i) => `<div class="vc-ph"><img src="${p}" alt=""><button type="button" class="x" onclick="vpRemove(${i})">&times;</button></div>`).join('')}
+            ${VSP.photos.length < VS_FAN_PHOTOS ? `<label class="vc-add">${VS_ICON.cam}<input type="file" accept="image/*" multiple hidden onchange="vpPick(this)"></label>` : ''}</div>
+        <small class="vs-mut">${VSP.photos.length}/${VS_FAN_PHOTOS} foto</small>
+        <div class="vs-form" style="margin-top:8px"><input id="vpUrl" placeholder="Link Spotify (opsional)" value="${escHtml(VSP.url)}" oninput="vsSpInput(this.value)"></div>
+        <div id="vpSp" style="margin-top:6px">${vsSpFormHtml()}</div>`, 'cp');
+}
+async function vsPostFan() {
+    const u = VAUTH.user; if (!u || VSP.busy) return;
+    const text = VSP.text.trim(), sp = VSP.sp;
+    if (VSP.url.trim() && !sp) { alert('Link Spotify tidak dikenali. Hapus atau perbaiki linknya.'); return; }
+    if (!text && !VSP.photos.length && !sp) { alert('Isi postingan dulu: teks, foto, atau link Spotify.'); return; }
+    VSP.busy = true; const go = $id('vpGo'); if (go) { go.disabled = true; go.textContent = 'Mengirim…'; }
+    try {
+        const doc = { uid: u.uid, name: vsFanName().slice(0, 60) || 'Penggemar', av: (vsProf().av || ''), groupId: '', text: text.slice(0, 2000), photos: VSP.photos.slice(0, VS_FAN_PHOTOS), likes: 0, ts: Date.now() };
+        if (sp) doc.spotify = { type: sp.type, id: sp.id, url: sp.url, title: String(sp.title || '').slice(0, 200), artist: String(sp.artist || '').slice(0, 200), cover: String(sp.cover || '').slice(0, 300) };
+        const id = 'fp_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+        await window.loreviaDoc.set('verseFanPosts', id, doc);
+        VSF.posts = [Object.assign({}, doc, { id, _id: id, fan: true, _liked: false })].concat(VSF.posts || []);
+        if (sp) VS.autoPid = id;
+        VSP.text = ''; VSP.photos = []; VSP.url = ''; VSP.sp = null; VSP.spState = '';
+        vsModalClose(); VS.tab = 'fans'; renderView(); vsScrollTop();
+    } catch (e) { alert('Postingan gagal dikirim: ' + vsAuthErr(e)); }
+    VSP.busy = false; const g2 = $id('vpGo'); if (g2) { g2.disabled = false; g2.textContent = 'Terbitkan'; }
+}
+// ---------- Pill audio Spotify (kecil, berbingkai; putar otomatis saat terlihat) ----------
+function vsMusicCard(sp, pid) {
+    const k = sp.type + '_' + sp.id, c = VS_SPC[k] || {}, title = sp.title || c.title || '', artist = sp.artist || c.artist || '', cover = sp.cover || c.cover || '';
+    return `<div class="vs-mc pill" data-pid="${escHtml(pid || '')}" data-uri="spotify:${escHtml(sp.type)}:${escHtml(sp.id)}" data-h="80" data-src="https://open.spotify.com/embed/${escHtml(sp.type)}/${escHtml(sp.id)}">
+        <div class="vs-mc-top"><span class="vs-mc-art">${cover ? `<img src="${escHtml(cover)}" alt="">` : VS_ICON.note}</span>
+        <div class="vs-spm vs-mc-meta" data-k="${escHtml(k)}" data-t="${escHtml(sp.type)}" data-i="${escHtml(sp.id)}" data-u="${escHtml(sp.url)}" ${title ? 'data-done="1"' : ''}><b>${escHtml(title || 'Musik di Spotify')}</b><small class="vs-mc-ar">${artist ? escHtml(artist) : (title ? '' : 'Mendeteksi judul & artis…')}</small></div>
+        <span class="vs-eq"><i></i><i></i><i></i><i></i></span></div>
+        <div class="vs-mc-host"></div></div>`;
+}
+function vsSpotifyHtml(sp) { return vsMusicCard(sp, ''); }
+// ---------- Musik Lorevia: HANYA audio yang diunggah di Dasbor Admin ----------
+const VSA = { i: -1, sel: 0, el: null, loading: false, bound: false };
+function vsAudios() { return (appData.audios || []).filter(a => a && a.data); }
+function vsAudPause() { try { if (VSA.el && !VSA.el.paused) VSA.el.pause(); } catch (e) {} }
+function vsAudInit() {
+    if (VSA.el) return VSA.el; const a = VSA.el = new Audio(); a.preload = 'auto';
+    ['play', 'pause', 'ended', 'waiting', 'playing', 'timeupdate', 'loadedmetadata'].forEach(ev => a.addEventListener(ev, () => { if (ev === 'ended') vsAudNext(1, true); vsAudSync(); }));
+    return a;
+}
+async function vsAudPlay(i) {
+    const l = vsAudios(), t = l[i]; if (!t) return;
+    const a = vsAudInit();
+    if (VSA.i === i && a.src) { if (a.paused) { try { await a.play(); } catch (e) {} } else a.pause(); return; }
+    VSA.i = i; VSA.sel = i; VSA.loading = true; vsAudSync();
+    if (VS.curMc && VS.curMc._c) { try { VS.curMc._c.pause(); } catch (e) {} }
+    try { const u = await mediaUrl(t); if (VSA.i !== i) return; a.src = u; await a.play(); }
+    catch (e) { VSA.loading = false; vsAudSync(); if (e && e.name !== 'AbortError') alert('Audio tidak bisa diputar: ' + (e.message || e)); }
+    VSA.loading = false; vsAudSync();
+}
+function vsAudNext(d, auto) {
+    const l = vsAudios(); if (!l.length) return; const from = VSA.i < 0 ? VSA.sel : VSA.i;
+    const n = (from + d + l.length) % l.length; vsAudPlay(n); if (VS.tab === 'music') vsShelfGo(n);
+}
+function vsAudSeek(ev, el) { const a = VSA.el; if (!a || !a.duration) return; const r = el.getBoundingClientRect(); a.currentTime = Math.max(0, Math.min(1, (ev.clientX - r.left) / r.width)) * a.duration; }
+function vsFmt(s) { s = Math.max(0, Math.floor(s || 0)); return Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0'); }
+function vsAudSync() {
+    const a = VSA.el, l = vsAudios(), t = l[VSA.i], playing = !!(a && !a.paused && !a.ended), pct = a && a.duration ? (a.currentTime / a.duration * 100) : 0;
+    document.body.classList.toggle('vs-aud-on', VSA.i >= 0 && !!t);
+    document.querySelectorAll('[data-aud]').forEach(el => {
+        const k = el.dataset.aud;
+        if (k === 'root') { el.classList.toggle('playing', playing); el.classList.toggle('loading', VSA.loading); }
+        else if (k === 'bar') el.style.setProperty('--p', pct + '%');
+        else if (k === 'cur') el.textContent = vsFmt(a && a.currentTime);
+        else if (k === 'dur') el.textContent = vsFmt(a && a.duration);
+        else if (k === 'title' && t) el.textContent = t.title || 'Tanpa judul';
+        else if (k === 'artist' && t) el.textContent = t.artist || 'Lorevia Music';
+    });
+}
+function vsMiniHtml() {
+    const t = vsAudios()[VSA.i]; if (!t) return '';
+    return `<div class="vs-mini" data-aud="root"><button type="button" class="vs-mini-in" onclick="vsTab('music')"><span class="vs-mini-art">${t.cover ? `<img src="${escHtml(t.cover)}" alt="">` : VS_ICON.note}</span><span class="vs-mini-t"><b data-aud="title">${escHtml(t.title || 'Tanpa judul')}</b><small data-aud="artist">${escHtml(t.artist || 'Lorevia Music')}</small></span></button>
+        <button type="button" class="vs-mini-b" onclick="vsAudPlay(${VSA.i})" aria-label="Putar/jeda"><svg class="pl" viewBox="0 0 24 24" width="22" height="22"><path fill="currentColor" d="M8 5v14l11-7z"/></svg><svg class="pa" viewBox="0 0 24 24" width="22" height="22"><path fill="currentColor" d="M6 5h4v14H6zm8 0h4v14h-4z"/></svg></button>
+        <button type="button" class="vs-mini-b" onclick="vsAudNext(1)" aria-label="Berikutnya"><svg viewBox="0 0 24 24" width="20" height="20"><path fill="currentColor" d="M6 6l9 6-9 6zM17 6h2v12h-2z"/></svg></button><i class="vs-mini-bar" data-aud="bar"></i></div>`;
+}
+function vsShelfGo(i) { const s = document.querySelector('.vs-shelf'); if (!s) return; const c = s.children[i]; if (c) s.scrollTo({ left: c.offsetLeft - (s.clientWidth - c.clientWidth) / 2, behavior: 'smooth' }); }
+function vsShelfScroll(s) {
+    const mid = s.scrollLeft + s.clientWidth / 2; let best = 0, bd = 1e9;
+    Array.from(s.children).forEach((c, i) => { const d = Math.abs(c.offsetLeft + c.clientWidth / 2 - mid); if (d < bd) { bd = d; best = i; } });
+    clearTimeout(s._t); s._t = setTimeout(() => { if (best !== VSA.sel || (VSA.i >= 0 && best !== VSA.i && VSA.el && !VSA.el.paused)) { const was = VSA.el && !VSA.el.paused; VSA.sel = best; if (was && best !== VSA.i) vsAudPlay(best); vsShelfMark(); } }, 120);
+    Array.from(s.children).forEach((c, i) => c.classList.toggle('on', i === best));
+    document.querySelectorAll('.vs-blob i').forEach((d, i) => d.classList.toggle('on', i === best));
+    const t = vsAudios()[best]; if (t) { const h = $id('vsShT'), a = $id('vsShA'); if (h) h.textContent = t.title || 'Tanpa judul'; if (a) a.textContent = t.artist || 'Lorevia Music'; }
+}
+function vsShelfMark() { document.querySelectorAll('.vs-sv').forEach(el => el.classList.toggle('sel', +el.dataset.i === VSA.sel)); }
+function vsShelfTap(i) { VSA.sel = i; const s = document.querySelector('.vs-shelf'); const on = s && s.children[i] && s.children[i].classList.contains('on'); if (on) vsAudPlay(i); else vsShelfGo(i); }
+function vsSleeve(t, i) {
+    return `<button type="button" class="vs-sv" data-i="${i}" onclick="vsShelfTap(${i})"><span class="vs-sv-disc"><i><b></b></i></span><span class="vs-sv-sl">${t.cover ? `<img src="${escHtml(t.cover)}" alt="">` : `<em>${VS_ICON.note}</em>`}<u></u></span></button>`;
+}
+function vsMusicHtml() {
+    const l = vsAudios();
+    if (!l.length) return vsSubHead('Lorevia Music', "vsTab('home')") + '<p class="vs-empty">Belum ada musik. Admin dapat mengunggah audio di Dasbor Admin &rarr; Audio Playlist.</p>';
+    if (VSA.sel >= l.length) VSA.sel = 0; const sel = VSA.i >= 0 ? VSA.i : VSA.sel, cur = l[sel] || l[0];
+    setTimeout(() => { const s = document.querySelector('.vs-shelf'); if (s) { const c = s.children[sel]; if (c) s.scrollLeft = c.offsetLeft - (s.clientWidth - c.clientWidth) / 2; vsShelfScroll(s); vsAudSync(); } }, 30);
+    return `${vsSubHead('Lorevia Music', "vsTab('home')")}<div class="vs-music" data-aud="root">
+        <div class="vs-shelf" onscroll="vsShelfScroll(this)">${l.map(vsSleeve).join('')}</div>
+        <div class="vs-blob">${l.map((_, i) => `<i class="${i === sel ? 'on' : ''}"></i>`).join('')}</div>
+        <div class="vs-mt"><h3 id="vsShT">${escHtml(cur.title || 'Tanpa judul')}</h3><p id="vsShA">${escHtml(cur.artist || 'Lorevia Music')}</p></div>
+        <div class="vs-prog"><span data-aud="cur">0:00</span><div class="vs-pbar" data-aud="bar" onclick="vsAudSeek(event,this)"><i></i></div><span data-aud="dur">0:00</span></div>
+        <div class="vs-ctl"><button type="button" onclick="vsAudNext(-1)" aria-label="Sebelumnya"><svg viewBox="0 0 24 24" width="24" height="24"><path fill="currentColor" d="M18 6l-9 6 9 6zM5 6h2v12H5z"/></svg></button>
+            <button type="button" class="big" onclick="vsAudPlay(vsShSel())" aria-label="Putar/jeda"><svg class="pl" viewBox="0 0 24 24" width="30" height="30"><path fill="currentColor" d="M8 5v14l11-7z"/></svg><svg class="pa" viewBox="0 0 24 24" width="30" height="30"><path fill="currentColor" d="M6 5h4v14H6zm8 0h4v14h-4z"/></svg></button>
+            <button type="button" onclick="vsAudNext(1)" aria-label="Berikutnya"><svg viewBox="0 0 24 24" width="24" height="24"><path fill="currentColor" d="M6 6l9 6-9 6zM17 6h2v12h-2z"/></svg></button></div></div>
+        <h4 class="vs-h">Daftar putar</h4><div class="vs-tl">${l.map((t, i) => `<button type="button" class="vs-trk ${i === sel ? 'on' : ''}" onclick="VSA.sel=${i}; vsAudPlay(${i}); vsShelfGo(${i})"><span class="vs-spc">${t.cover ? `<img src="${escHtml(t.cover)}" alt="">` : VS_ICON.note}</span><div><b>${escHtml(t.title || 'Tanpa judul')}</b><small>${escHtml(t.artist || 'Lorevia Music')}</small></div>${VS_ICON.play}</button>`).join('')}</div>`;
+}
+function vsShSel() { return VSA.sel; }
+// ---------- Langganan: pembayaran terdeteksi OTOMATIS (tanpa tombol "sudah bayar") ----------
+const VSQ = { aid: '', t0: 0, exp: 0, timer: null, poll: null, order: '' };
+function vsSubStop() { clearInterval(VSQ.timer); clearInterval(VSQ.poll); VSQ.timer = VSQ.poll = null; VSQ.order = ''; }
+function vsSubClose() { vsSubStop(); vsModalClose(); }
+function vsPayHead(a, ext) { return `<div class="vs-pay-h">${vsAv(a.photo, a.name, 'lg', vsArtistLv(a.id))}<div><small>${ext ? 'Perpanjang langganan' : 'Berlangganan'}</small><h3>${escHtml(a.name)}${VS_VF}</h3></div></div>`; }
+async function vsSubOpen(aid) {
+    if (!VAUTH.user) { alert('Masuk dengan akun penggemar dulu untuk berlangganan.'); return; }
+    const a = vsArtist(aid); if (!a) return; vsSubStop();
+    const s = vsMySub(aid), ext = !!(s && s.end > Date.now()); VSQ.aid = aid; VSQ.t0 = Date.now();
+    const head = vsPayHead(a, ext) + `<ul class="vs-pay-ul"><li>Chat langsung dengan ${escHtml(a.name)}</li><li>Panggilan suara (call)</li><li>Badge api, TOP &amp; Avatar Border hutan seiring banyaknya langganan</li></ul><div class="vs-pay-amt"><span>Total</span><b>${vsRp(VS_SUB_PRICE)}</b><small>/ ${VS_SUB_DAYS} hari</small></div>`;
+    vsModal(`<div class="vs-pay">${head}<div class="vs-qr"><div class="vs-qr-in vs-qr-ld"><span class="vs-spin"></span></div><div class="vs-qr-cap"><b>QRIS</b><span>Membuat tagihan…</span></div></div><button type="button" class="vs-link" onclick="vsSubClose()">Batal</button></div>`, 'wide');
+    let r;
+    try {
+        const res = await fetch('/api/pay-create', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ idToken: await window.loreviaAuth.idToken(), artistId: aid }) });
+        r = await res.json(); if (!res.ok || !r.qr) throw new Error(r.message || 'Gagal membuat tagihan.');
+    } catch (e) {
+        vsModal(`<div class="vs-pay">${head}<div class="vs-note">${escHtml(e.message || String(e))}</div><p class="vs-mut" style="font-size:.78rem">Langganan hanya aktif lewat pembayaran yang terdeteksi otomatis oleh sistem. Bila pesan ini terus muncul, hubungi admin Lorevia.</p><button type="button" class="vs-pill" onclick="vsSubOpen('${aid}')">Coba lagi</button><button type="button" class="vs-link" onclick="vsSubClose()">Tutup</button></div>`, 'wide'); return;
+    }
+    VSQ.order = r.order; VSQ.exp = r.expires || Date.now() + 15 * 60000;
+    vsModal(`<div class="vs-pay">${head}<div class="vs-qr"><div class="vs-qr-in">${LV_QR.svg(r.qr)}</div><div class="vs-qr-cap"><b>QRIS</b><span>Lorevia Verse &middot; ${escHtml(r.order)}</span></div></div>
+        <ol class="vs-pay-st"><li>Buka DANA / GoPay / OVO / ShopeePay / m-banking lalu scan QRIS</li><li>Nominal <b>${vsRp(VS_SUB_PRICE)}</b> terisi otomatis</li><li>Setelah bayar, langganan aktif <b>sendiri</b> &mdash; tidak perlu menekan apa pun</li></ol>
+        <div class="vs-pay-wait"><span class="vs-spin"></span><div><b>Menunggu pembayaran…</b><small>Berlaku <span id="vsqT">15:00</span></small></div></div>
+        <button type="button" class="vs-link" onclick="vsSubClose()">Batal</button></div>`, 'wide');
+    VSQ.timer = setInterval(() => { const t = $id('vsqT'); if (!t) { vsSubStop(); return; } const left = Math.max(0, VSQ.exp - Date.now()); t.textContent = String(Math.floor(left / 60000)).padStart(2, '0') + ':' + String(Math.floor(left / 1000) % 60).padStart(2, '0'); if (!left) { vsSubStop(); vsModal(`<div class="vs-pay">${head}<div class="vs-note">QR kedaluwarsa. Jika kamu sudah membayar, langganan tetap aktif otomatis dalam beberapa saat.</div><button type="button" class="vs-pill" onclick="vsSubOpen('${aid}')">Buat QR baru</button><button type="button" class="vs-link" onclick="vsSubClose()">Tutup</button></div>`, 'wide'); } }, 500);
+    const id = VAUTH.user.uid + '_' + aid, before = s ? s.n || 0 : 0;
+    VSQ.poll = setInterval(async () => {
+        if (!$id('vsqT')) { vsSubStop(); return; }
+        try {
+            const d = await window.loreviaDoc.get('verseSubs', id);
+            if (d && (d.n || 0) > before && d.end > Date.now()) { vsSubStop(); d._id = id; VSB.mine = (VSB.mine || []).filter(x => x.artistId !== aid).concat([d]); VSB.all = (VSB.all || []).filter(x => x._id !== id).concat([d]); vsLoadSubsRecalc(); vsSubDone(a, d); }
+        } catch (e) {}
+    }, 3000);
+}
+function vsSubDone(a, d) {
+    vsModal(`<div class="vs-pay ok"><div class="vs-burst">${Array.from({ length: 14 }, (_, i) => `<i style="--a:${i * 25.7}deg;--d:${0.55 + (i % 4) * 0.12}s"></i>`).join('')}<span>${VS_ICON.check}</span></div><h3>Pembayaran diterima!</h3><p class="vs-mut">Chat &amp; call dengan <b>${escHtml(a.name)}</b> aktif sampai <b>${vsDate(d.end)}</b>.</p>
+        ${vsLvLine()}<button type="button" class="vs-pill" onclick="vsModalClose(); vsOpenChat('${a.id}')">Mulai chat</button><button type="button" class="vs-link" onclick="vsModalClose(); renderView()">Tutup</button></div>`);
+}
+// ---------- Navigasi kaca 3D melayang ----------
+const VS_NAV = [['home', 'home', 'Home'], ['fans', 'people', 'Fans'], ['compose', 'plus', ''], ['artists', 'search', 'Discover'], ['me', 'me', 'My']];
+function renderView_verse() {
+    const content = $id('appContent');
+    if (currentRoute !== 'toko') stopPromoBanner();
+    if (currentRoute !== 'verse') return;
+    vsAuthStart();
+    if (VS.tab !== 'chat' && !(VS.tab === 'me' && VSM.fan)) vsChatStop();
+    if (vsSession()) vsCallWatch();
+    if (VSB.all === null && !VSB.loading && vsCanView()) vsLoadSubs();
+    if (VS.loginSlug && vsStaff()) {
+        VS.loginSlug = ''; VS.tab = 'me';
+        try { history.replaceState(null, '', (location.pathname.replace(/\/[^\/]*login\/?$/, '/') || '/') + '?p=verse'); } catch (e) {}
+    }
+    const splash = vsNeedReg() ? vsRegHtml() : ((VS.loginSlug || !vsCanView()) ? vsSplashHtml() : '');
+    const keep = document.querySelector('.vs'), st = keep ? keep.scrollTop : 0;
+    if (splash) { content.innerHTML = `<div class="vs splash"><div class="vs-bg"><i></i><i></i><i></i></div>${splash}</div>`; vsBubbles(); return; }
+    if (VAUTH.user && VSF.posts === null) vsLoadFan();
+    const staff = !!(vsSession() || vsGroupSession());
+    let body;
+    if (VS.artistId && vsArtist(VS.artistId)) body = vsArtistHtml(vsArtist(VS.artistId));
+    else body = VS.tab === 'artists' ? vsArtistsHtml() : VS.tab === 'fans' ? vsFansHtml() : VS.tab === 'music' ? vsMusicHtml() : VS.tab === 'board' ? vsBoardHtml() : VS.tab === 'chats' ? vsChatsHtml() : VS.tab === 'chat' ? vsChatHtml() : VS.tab === 'vote' ? vsVoteHtml() : VS.tab === 'store' ? vsStoreHtml()
+        : VS.tab === 'letter' ? vsLetterHtml() : VS.tab === 'me' ? vsMeHtml() : VS.tab === 'notif' ? vsNotifHtml() : VS.tab === 'settings' ? vsSettingsHtml()
+        : (VS.tab === 'community' && vsGroup(VS.groupId)) ? vsCommunityHtml(vsGroup(VS.groupId)) : vsHomeHtml();
+    const showTop = !!VS.artistId || VS.tab === 'home' || (VS.tab === 'me' && (staff || !VAUTH.user));
+    const navOn = VS.artistId ? 'artists' : ({ home: 'home', music: 'home', fans: 'fans', board: 'artists', chats: 'artists', chat: 'artists', artists: 'artists', community: 'artists', store: 'artists', letter: 'artists', vote: 'artists', notif: 'me', me: 'me', settings: 'me' }[VS.tab] || 'home');
+    const unread = vsUnread();
+    const slots = VS_NAV.filter(n => n[0] !== 'compose').map(n => n[0]);   // 4 tombol + tombol + tengah
+    const idxOf = t => VS_NAV.findIndex(n => n[0] === t), cur = idxOf(navOn), prev = VS.navPrev == null ? cur : VS.navPrev; VS.navPrev = cur;
+    const nb = ([t, ico, label]) => t === 'compose'
+        ? `<button type="button" class="vs-nb plus" onclick="vsOpenCompose()" aria-label="Posting"><span class="vs-ni">${VS_ICON.plus}</span></button>`
+        : `<button type="button" class="vs-nb ${navOn === t ? 'on' : ''}" onclick="vsTab('${t}')" aria-label="${label}"><span class="vs-ni">${VS_ICON[ico]}</span><em>${label}</em>${t === 'me' && unread ? '<i class="vs-dot"></i>' : ''}</button>`;
+    content.innerHTML = `<div class="vs"><div class="vs-bg"><i></i><i></i><i></i></div>
+        ${showTop ? `<div class="vs-top"><button type="button" class="vs-round bub" data-drag onclick="navigate('beranda')" aria-label="Kembali ke situs">${VS_ICON.back}</button>
+            <div class="vs-brand"><span>${LOGO_VERSE}</span><b>Lorevia Verse</b></div>
+            <div class="vs-top-r"><button type="button" class="vs-round bub" data-drag onclick="vsTab('artists'); setTimeout(function(){var q=document.getElementById('vsQ'); q && q.focus();}, 60)" aria-label="Cari">${VS_ICON.search}</button>
+            <button type="button" class="vs-round bub" data-drag onclick="vsTab('notif')" aria-label="Notifikasi">${VS_ICON.bell}${unread ? '<i class="vs-dot"></i>' : ''}</button></div></div>` : ''}
+        <main class="vs-main ${showTop ? '' : 'notop'}">${body}</main>
+        ${VS.tab === 'music' ? '' : vsMiniHtml()}
+        <nav class="vs-nav glass3d" style="--n:${VS_NAV.length};--i:${prev}"><i class="vs-nb-bub"></i>${VS_NAV.map(nb).join('')}</nav></div>`;
+    const el = document.querySelector('.vs'); if (el && st) el.scrollTop = st;
+    if (prev !== cur) requestAnimationFrame(() => requestAnimationFrame(() => { const n = document.querySelector('.vs-nav'); if (n) n.style.setProperty('--i', cur); }));
+    else { const n = document.querySelector('.vs-nav'); if (n) n.style.setProperty('--i', cur); }
+    vsBubbles(); vsAdStart(); vsAudSync();
+    if (VS.tab === 'music') requestAnimationFrame(() => requestAnimationFrame(() => { const sh = document.querySelector('.vs-shelf'); if (sh) { const c = sh.children[VSA.i >= 0 ? VSA.i : VSA.sel]; if (c) sh.scrollLeft = c.offsetLeft - (sh.clientWidth - c.clientWidth) / 2; vsShelfScroll(sh); vsAudSync(); } }));
+}
 
 
 // ======== Halaman: medpart ========

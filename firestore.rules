@@ -12,13 +12,56 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
+    // =====================================================================
+    // DAFTAR ISI  (tiap fitur = SATU BLOK mandiri: fungsi pemeriksa + aturan koleksi)
+    //   Mengubah/menghapus satu blok tidak memengaruhi blok lain.
+    //   BAGIAN BERSAMA : alat bantu umum + pemeriksa peran artis/grup Verse
+    //   F01 PENGUMUMAN
+    //   F02 ACHIEVEMENT AGENSI
+    //   F03 HISTORY AGENSI
+    //   F04 KERJA SAMA
+    //   F05 DISPATCH / BERITA RESMI
+    //   F06 OFFICIAL PROMOTE / MEDPART
+    //   F07 STRUKTUR TEAM
+    //   F08 GENERASI
+    //   F09 MEMBERS / ARTIS SITUS
+    //   F10 GUEST BOX
+    //   F11 TOKO: PRODUK (termasuk store grup Verse)
+    //   F12 TOKO: PROMO & VOUCHER
+    //   F13 TOKO: PESANAN
+    //   F14 VIDEO: PLAYLIST
+    //   F15 VIDEO: ITEM
+    //   F16 AUDIO: PLAYLIST
+    //   F17 AUDIO: ITEM LAGU
+    //   F18 FILE VIDEO & AUDIO (potongan)
+    //   F19 KOMENTAR (video, audio, postingan Verse)
+    //   V01 VERSE: AKUN GRUP
+    //   V02 VERSE: AKUN ARTIS (termasuk achievement tambahan)
+    //   V03 VERSE: POSTINGAN ARTIS/GRUP (musik, eksklusif)
+    //   V04 VERSE: STORY ARTIS
+    //   V05 VERSE: PEMBAYARAN KONTEN EKSKLUSIF
+    //   V06 VERSE: PERAN ARTIS/GRUP (email -> akun)
+    //   V07 VERSE: PROFIL PENGGUNA
+    //   V08 VERSE: POSTINGAN PENGGEMAR
+    //   V09 VERSE: USERNAME UNIK
+    //   V10 VERSE: LANGGANAN CHAT & CALL (ditulis server saat bayar terdeteksi)
+    //   V11 VERSE: PESAN CHAT
+    //   V12 VERSE: PANGGILAN SUARA (sinyal WebRTC)
+    //   V13 VERSE: SURAT UNTUK IDOL
+    //   V14 VERSE: EVENT VOTE
+    //   V15 VERSE: SUARA VOTE
+    //   V16 VERSE: BANNER IKLAN BERANDA
+    //   V17 VERSE: TAGIHAN PEMBAYARAN (ditulis server)
+    //   S01 PENGATURAN UMUM
+    //   PENUTUP        : semua koleksi lain ditolak
+    // =====================================================================
+
     // ---------------------------------------------------------------
-    // ALAT BANTU UMUM
+    // BAGIAN BERSAMA 1: ALAT BANTU UMUM (dipakai banyak blok; jangan diubah sembarangan)
     // ---------------------------------------------------------------
     function body()  { return request.resource.data; }
     function has(f)  { return f in body(); }
     function small() { return body().keys().size() <= 80; }
-
     function str(f, max) {
       return !has(f) || (body()[f] is string && body()[f].size() <= max);
     }
@@ -39,107 +82,9 @@ service cloud.firestore {
     function base()    { return small() && orderOk(); }
 
     // ---------------------------------------------------------------
-    // PEMERIKSA PER FITUR
+    // BAGIAN BERSAMA 2: PEMERIKSA PERAN VERSE (dipakai surat, chat, call)
+    // peran sah = dokumen verseStaff milik email Google/akun artis + versi cocok dengan akun
     // ---------------------------------------------------------------
-    function okAnnouncement() {
-      return base() && str('title', 300) && str('content', 200000) && str('date', 60) && pic('img') && pic('image');
-    }
-    function okAchievement() {
-      return base() && str('title', 300) && str('desc', 200000) && str('year', 30) && pic('img');
-    }
-    function okHistory() {
-      return base() && str('title', 300) && str('date', 60) && str('story', 200000) && arr('contents', 40) && pic('img');
-    }
-    function okCooperation() {
-      return base() && str('title', 300) && str('partner', 300) && str('date', 60) && str('story', 200000) && arr('contents', 40) && pic('img');
-    }
-    function okDispatch() {
-      return base() && str('title', 300) && str('date', 60) && str('content', 200000) && pic('img');
-    }
-    function okMedpart() {
-      return base() && str('title', 300) && str('partner', 300) && str('date', 60) && str('desc', 200000) && pic('img');
-    }
-    function okStructure() {
-      return base() && str('name', 200) && str('role', 200) && pic('img');
-    }
-    function okGeneration() {
-      return base() && has('name') && str('name', 100) && body().name.size() > 0;
-    }
-    function okMember() {
-      return base() && str('name', 200) && str('stageName', 200) && str('dob', 30) && str('faceClaim', 200)
-          && str('tiktok', 300) && str('genId', 80) && pic('img');
-    }
-    function okGuest() {
-      return base() && str('name', 100) && str('message', 1000);
-    }
-    function okProduct() {
-      return base() && str('name', 300) && str('description', 5000) && num('price') && num('qty') && arr('images', 12)
-          && str('artistId', 80) && str('groupId', 80) && (!has('kind') || body().kind in ['album', 'merch']);
-    }
-    function okPromo() {
-      return base() && str('code', 60) && str('type', 20) && num('value') && num('maxDiscount') && num('minPurchase');
-    }
-    function okOrder() {
-      return base() && str('status', 40) && num('total');
-    }
-    function okVideoPlaylist() {
-      return base() && str('name', 200) && str('desc', 2000) && pic('cover');
-    }
-    function okVideo() {
-      return base() && str('title', 300) && num('likes') && num('views') && num('commentCount') && pic('thumb');
-    }
-    function okAudioPlaylist() {
-      return base() && str('name', 200) && str('desc', 2000) && pic('cover');
-    }
-    function okAudio() {
-      return base() && str('title', 300) && str('artist', 200) && str('kind', 20)
-          && num('likes') && num('plays') && num('commentCount') && pic('cover');
-    }
-    function okChunk() {
-      return small() && body().d is string && body().d.size() <= 800000;
-    }
-    function okComment() {
-      return small()
-          && body().type in ['video', 'audio', 'versePost']
-          && body().itemId is string && body().itemId.size() <= 80
-          && body().name is string && body().name.size() > 0 && body().name.size() <= 60
-          && body().text is string && body().text.size() > 0 && body().text.size() <= 500
-          && str('uid', 128) && str('av', 14000) && str('by', 80);
-    }
-
-
-    // ---- Lorevia Verse ----
-    function okVerseGroup() {
-      return base() && has('name') && str('name', 100) && body().name.size() > 0 && str('bio', 500) && str('slug', 60) && str('staffVer', 40) && str('emailHint', 80) && pic('photo') && pic('banner');
-    }
-    function okVerseArtist() {
-      return base() && has('name') && str('name', 100) && body().name.size() > 0 && str('groupId', 80) && str('bio', 500)
-          && str('staffVer', 40) && str('emailHint', 80) && pic('photo') && arr('achv', 20);
-    }
-    function okVerseEvent() {
-      return base() && str('title', 150) && str('desc', 500) && num('end') && num('ts') && arr('candidates', 30)
-          && (!has('status') || body().status in ['open', 'closed']);
-    }
-    function okStaff() {
-      return small() && has('kind') && body().kind in ['artist', 'group'] && str('refId', 80) && str('groupId', 80) && has('ver') && str('ver', 40) && num('ts');
-    }
-    function okProfile() {
-      return small() && str('nickname', 40) && str('uid', 128) && str('bio', 300) && str('photo', 120000) && str('av', 14000)
-          && str('cover', 250000) && arr('unfollow', 300) && num('joined') && num('ts')
-          && str('username', 20) && str('ph', 100) && str('ps', 60);
-    }
-    // postingan penggemar (foto + Spotify) di komunitas
-    function okFanPost() {
-      return small() && request.auth != null && body().uid == request.auth.uid
-          && str('name', 60) && str('av', 14000) && str('groupId', 80) && str('text', 2000) && arr('photos', 4)
-          && (!has('spotify') || body().spotify == null || body().spotify is map) && num('likes') && num('ts');
-    }
-    function okLetter() {
-      return small() && request.auth != null && body().fromUid == request.auth.uid
-          && body().text is string && body().text.size() >= 5 && body().text.size() <= 1000
-          && body().toArtistId is string && body().toArtistId.size() <= 80
-          && str('fromName', 60) && str('toName', 100) && str('groupId', 80) && num('ts');
-    }
     // peran artis/grup yang sah: dokumen verseStaff milik email Google ini + versinya cocok dengan data akun
     function staffDoc() {
       return get(/databases/$(database)/documents/verseStaff/$(request.auth.token.email.lower())).data;
@@ -153,61 +98,13 @@ service cloud.firestore {
               ? get(/databases/$(database)/documents/verseArtists/$(toId)).data.get('staffVer', '') == staffDoc().ver
               : get(/databases/$(database)/documents/verseGroups/$(toId)).data.get('staffVer', '') == staffDoc().ver);
     }
-    function okVote(id) {
-      return request.auth != null && body().uid == request.auth.uid && has('eventId') && body().eventId is string
-          && id == body().eventId + '_' + request.auth.uid
-          && body().keys().hasOnly(['eventId', 'uid', 'artistId', 'ts'])
-          && exists(/databases/$(database)/documents/verseEvents/$(body().eventId))
-          && get(/databases/$(database)/documents/verseEvents/$(body().eventId)).data.get('status', '') == 'open'
-          && body().artistId in get(/databases/$(database)/documents/verseEvents/$(body().eventId)).data.get('candidates', []);
-    }
-    function okVersePost() {
-      return base() && str('text', 3000) && arr('photos', 10) && str('groupId', 80) && str('authorId', 80)
-          && (!has('authorType') || body().authorType in ['group', 'artist'])
-          && flag('exclusive') && (!has('spotify') || body().spotify == null || body().spotify is map)
-          && (!has('price') || (body().price is number && body().price >= 0 && body().price <= 10000))
-          && num('likes') && num('ts');
-    }
-    function okVerseStory() {
-      return base() && str('artistId', 80) && str('groupId', 80) && str('text', 300) && pic('photo') && num('ts');
-    }
-    function okVerseUnlock() {
-      return base() && str('postId', 80) && str('buyer', 100) && str('contact', 200) && str('code', 12)
-          && (!has('status') || body().status in ['pending', 'paid']) && num('ts');
-    }
 
-    // ---- Langganan chat & call ----
-    function nowMs() { return request.time.toMillis(); }
-    function subActive(chatId) {
-      return exists(/databases/$(database)/documents/verseSubs/$(chatId))
-          && get(/databases/$(database)/documents/verseSubs/$(chatId)).data.end > nowMs();
+    // =====================================================================
+    // F01 PENGUMUMAN
+    // =====================================================================
+    function okAnnouncement() {
+      return base() && str('title', 300) && str('content', 200000) && str('date', 60) && pic('img') && pic('image');
     }
-    function okSubDoc(id) {
-      return small() && request.auth != null && body().uid == request.auth.uid
-          && body().artistId is string && body().artistId.size() <= 80 && id == body().uid + '_' + body().artistId
-          && body().amount == 10000 && body().n is number && body().end is number && body().ts is number
-          && str('name', 60) && str('av', 14000) && str('groupId', 80) && num('first');
-    }
-    function okMsg() {
-      return small() && request.auth != null
-          && body().fanUid is string && body().artistId is string && body().chatId == body().fanUid + '_' + body().artistId
-          && body().text is string && body().text.size() >= 1 && body().text.size() <= 1000
-          && body().role in ['fan', 'artist'] && str('name', 60) && str('groupId', 80) && num('ts')
-          && ((body().role == 'fan' && body().fanUid == request.auth.uid && body().uid == request.auth.uid && subActive(body().chatId))
-              || (body().role == 'artist' && body().uid == request.auth.uid && isStaffFor(body().artistId)));
-    }
-    function callParty(d) {
-      return request.auth != null && (d.fanUid == request.auth.uid || isStaffFor(d.artistId));
-    }
-    function okCallDoc(id) {
-      return small() && body().fanUid is string && body().artistId is string && id == body().fanUid + '_' + body().artistId && body().chatId == id
-          && body().state in ['ringing', 'active', 'declined', 'ended']
-          && str('name', 60) && str('groupId', 80) && str('offer', 30000) && str('answer', 30000) && num('ts');
-    }
-
-    // ---------------------------------------------------------------
-    // 1. PENGUMUMAN (foto opsional + isi "baca selengkapnya")
-    // ---------------------------------------------------------------
     match /announcements/{id} {
       allow get, list: if true;
       allow create: if okAnnouncement();
@@ -215,9 +112,12 @@ service cloud.firestore {
       allow delete: if true;
     }
 
-    // ---------------------------------------------------------------
-    // 2. ACHIEVEMENT / PENGHARGAAN
-    // ---------------------------------------------------------------
+    // =====================================================================
+    // F02 ACHIEVEMENT AGENSI
+    // =====================================================================
+    function okAchievement() {
+      return base() && str('title', 300) && str('desc', 200000) && str('year', 30) && pic('img');
+    }
     match /achievements/{id} {
       allow get, list: if true;
       allow create: if okAchievement();
@@ -225,9 +125,12 @@ service cloud.firestore {
       allow delete: if true;
     }
 
-    // ---------------------------------------------------------------
-    // 3. HISTORY AGENSI (khusus sejarah Lorevia)
-    // ---------------------------------------------------------------
+    // =====================================================================
+    // F03 HISTORY AGENSI
+    // =====================================================================
+    function okHistory() {
+      return base() && str('title', 300) && str('date', 60) && str('story', 200000) && arr('contents', 40) && pic('img');
+    }
     match /histories/{id} {
       allow get, list: if true;
       allow create: if okHistory();
@@ -235,9 +138,12 @@ service cloud.firestore {
       allow delete: if true;
     }
 
-    // ---------------------------------------------------------------
-    // 4. KERJA SAMA / COOPERATION (terpisah dari History)
-    // ---------------------------------------------------------------
+    // =====================================================================
+    // F04 KERJA SAMA
+    // =====================================================================
+    function okCooperation() {
+      return base() && str('title', 300) && str('partner', 300) && str('date', 60) && str('story', 200000) && arr('contents', 40) && pic('img');
+    }
     match /cooperations/{id} {
       allow get, list: if true;
       allow create: if okCooperation();
@@ -245,9 +151,12 @@ service cloud.firestore {
       allow delete: if true;
     }
 
-    // ---------------------------------------------------------------
-    // 5. DISPATCH / BERITA RESMI
-    // ---------------------------------------------------------------
+    // =====================================================================
+    // F05 DISPATCH / BERITA RESMI
+    // =====================================================================
+    function okDispatch() {
+      return base() && str('title', 300) && str('date', 60) && str('content', 200000) && pic('img');
+    }
     match /dispatches/{id} {
       allow get, list: if true;
       allow create: if okDispatch();
@@ -255,9 +164,12 @@ service cloud.firestore {
       allow delete: if true;
     }
 
-    // ---------------------------------------------------------------
-    // 6. OFFICIAL PROMOTE / MEDPART
-    // ---------------------------------------------------------------
+    // =====================================================================
+    // F06 OFFICIAL PROMOTE / MEDPART
+    // =====================================================================
+    function okMedpart() {
+      return base() && str('title', 300) && str('partner', 300) && str('date', 60) && str('desc', 200000) && pic('img');
+    }
     match /medparts/{id} {
       allow get, list: if true;
       allow create: if okMedpart();
@@ -265,9 +177,12 @@ service cloud.firestore {
       allow delete: if true;
     }
 
-    // ---------------------------------------------------------------
-    // 7. STRUKTUR TEAM (bagan organisasi)
-    // ---------------------------------------------------------------
+    // =====================================================================
+    // F07 STRUKTUR TEAM
+    // =====================================================================
+    function okStructure() {
+      return base() && str('name', 200) && str('role', 200) && pic('img');
+    }
     match /adminStructure/{id} {
       allow get, list: if true;
       allow create: if okStructure();
@@ -275,9 +190,12 @@ service cloud.firestore {
       allow delete: if true;
     }
 
-    // ---------------------------------------------------------------
-    // 8. GENERASI (Gen 1, Gen 2, ... diatur dari dasbor)
-    // ---------------------------------------------------------------
+    // =====================================================================
+    // F08 GENERASI
+    // =====================================================================
+    function okGeneration() {
+      return base() && has('name') && str('name', 100) && body().name.size() > 0;
+    }
     match /generations/{id} {
       allow get, list: if true;
       allow create: if okGeneration();
@@ -285,9 +203,13 @@ service cloud.firestore {
       allow delete: if true;
     }
 
-    // ---------------------------------------------------------------
-    // 9. MEMBERS / ARTIS (nama, tanggal lahir, face claim, TikTok, foto)
-    // ---------------------------------------------------------------
+    // =====================================================================
+    // F09 MEMBERS / ARTIS SITUS
+    // =====================================================================
+    function okMember() {
+      return base() && str('name', 200) && str('stageName', 200) && str('dob', 30) && str('faceClaim', 200)
+          && str('tiktok', 300) && str('genId', 80) && pic('img');
+    }
     match /members/{id} {
       allow get, list: if true;
       allow create: if okMember();
@@ -295,9 +217,12 @@ service cloud.firestore {
       allow delete: if true;
     }
 
-    // ---------------------------------------------------------------
-    // 10. GUEST BOX (pesan pengunjung)
-    // ---------------------------------------------------------------
+    // =====================================================================
+    // F10 GUEST BOX
+    // =====================================================================
+    function okGuest() {
+      return base() && str('name', 100) && str('message', 1000);
+    }
     match /guestBoxes/{id} {
       allow get, list: if true;
       allow create: if okGuest();
@@ -305,9 +230,13 @@ service cloud.firestore {
       allow delete: if true;
     }
 
-    // ---------------------------------------------------------------
-    // 11. TOKO: PRODUK (termasuk store grup Lorevia Verse, diisi admin)
-    // ---------------------------------------------------------------
+    // =====================================================================
+    // F11 TOKO: PRODUK (termasuk store grup Verse)
+    // =====================================================================
+    function okProduct() {
+      return base() && str('name', 300) && str('description', 5000) && num('price') && num('qty') && arr('images', 12)
+          && str('artistId', 80) && str('groupId', 80) && (!has('kind') || body().kind in ['album', 'merch']);
+    }
     match /products/{id} {
       allow get, list: if true;
       allow create: if okProduct();
@@ -315,9 +244,12 @@ service cloud.firestore {
       allow delete: if true;
     }
 
-    // ---------------------------------------------------------------
-    // 12. TOKO: PROMO & VOUCHER
-    // ---------------------------------------------------------------
+    // =====================================================================
+    // F12 TOKO: PROMO & VOUCHER
+    // =====================================================================
+    function okPromo() {
+      return base() && str('code', 60) && str('type', 20) && num('value') && num('maxDiscount') && num('minPurchase');
+    }
     match /promos/{id} {
       allow get, list: if true;
       allow create: if okPromo();
@@ -325,9 +257,12 @@ service cloud.firestore {
       allow delete: if true;
     }
 
-    // ---------------------------------------------------------------
-    // 13. TOKO: PESANAN
-    // ---------------------------------------------------------------
+    // =====================================================================
+    // F13 TOKO: PESANAN
+    // =====================================================================
+    function okOrder() {
+      return base() && str('status', 40) && num('total');
+    }
     match /orders/{id} {
       allow get, list: if true;
       allow create: if okOrder();
@@ -335,9 +270,12 @@ service cloud.firestore {
       allow delete: if true;
     }
 
-    // ---------------------------------------------------------------
-    // 14. AKTIVITAS - VIDEO: PLAYLIST
-    // ---------------------------------------------------------------
+    // =====================================================================
+    // F14 VIDEO: PLAYLIST
+    // =====================================================================
+    function okVideoPlaylist() {
+      return base() && str('name', 200) && str('desc', 2000) && pic('cover');
+    }
     match /videoPlaylists/{id} {
       allow get, list: if true;
       allow create: if okVideoPlaylist();
@@ -345,9 +283,12 @@ service cloud.firestore {
       allow delete: if true;
     }
 
-    // ---------------------------------------------------------------
-    // 15. AKTIVITAS - VIDEO: ITEM VIDEO (suka, tonton, komentar)
-    // ---------------------------------------------------------------
+    // =====================================================================
+    // F15 VIDEO: ITEM
+    // =====================================================================
+    function okVideo() {
+      return base() && str('title', 300) && num('likes') && num('views') && num('commentCount') && pic('thumb');
+    }
     match /videos/{id} {
       allow get, list: if true;
       allow create: if okVideo();
@@ -355,9 +296,12 @@ service cloud.firestore {
       allow delete: if true;
     }
 
-    // ---------------------------------------------------------------
-    // 16. AKTIVITAS - AUDIO: PLAYLIST
-    // ---------------------------------------------------------------
+    // =====================================================================
+    // F16 AUDIO: PLAYLIST
+    // =====================================================================
+    function okAudioPlaylist() {
+      return base() && str('name', 200) && str('desc', 2000) && pic('cover');
+    }
     match /audioPlaylists/{id} {
       allow get, list: if true;
       allow create: if okAudioPlaylist();
@@ -365,9 +309,13 @@ service cloud.firestore {
       allow delete: if true;
     }
 
-    // ---------------------------------------------------------------
-    // 17. AKTIVITAS - AUDIO: ITEM LAGU (judul, artis, cover/ORI, suka)
-    // ---------------------------------------------------------------
+    // =====================================================================
+    // F17 AUDIO: ITEM LAGU
+    // =====================================================================
+    function okAudio() {
+      return base() && str('title', 300) && str('artist', 200) && str('kind', 20)
+          && num('likes') && num('plays') && num('commentCount') && pic('cover');
+    }
     match /audios/{id} {
       allow get, list: if true;
       allow create: if okAudio();
@@ -375,9 +323,12 @@ service cloud.firestore {
       allow delete: if true;
     }
 
-    // ---------------------------------------------------------------
-    // 18. FILE VIDEO & AUDIO (dipecah per potongan)
-    // ---------------------------------------------------------------
+    // =====================================================================
+    // F18 FILE VIDEO & AUDIO (potongan)
+    // =====================================================================
+    function okChunk() {
+      return small() && body().d is string && body().d.size() <= 800000;
+    }
     match /mediaChunks/{id} {
       allow get, list: if true;
       allow create: if okChunk();
@@ -385,9 +336,17 @@ service cloud.firestore {
       allow delete: if true;
     }
 
-    // ---------------------------------------------------------------
-    // 19. KOMENTAR VIDEO, AUDIO & POSTINGAN VERSE (boleh dibuat & dihapus, tidak boleh diubah)
-    // ---------------------------------------------------------------
+    // =====================================================================
+    // F19 KOMENTAR (video, audio, postingan Verse)
+    // =====================================================================
+    function okComment() {
+      return small()
+          && body().type in ['video', 'audio', 'versePost']
+          && body().itemId is string && body().itemId.size() <= 80
+          && body().name is string && body().name.size() > 0 && body().name.size() <= 60
+          && body().text is string && body().text.size() > 0 && body().text.size() <= 500
+          && str('uid', 128) && str('av', 14000) && str('by', 80);
+    }
     match /comments/{id} {
       allow get, list: if true;
       allow create: if okComment();
@@ -395,9 +354,12 @@ service cloud.firestore {
       allow delete: if true;
     }
 
-    // ---------------------------------------------------------------
-    // 21. LOREVIA VERSE: AKUN GRUP
-    // ---------------------------------------------------------------
+    // =====================================================================
+    // V01 VERSE: AKUN GRUP
+    // =====================================================================
+    function okVerseGroup() {
+      return base() && has('name') && str('name', 100) && body().name.size() > 0 && str('bio', 500) && str('slug', 60) && str('staffVer', 40) && str('emailHint', 80) && pic('photo') && pic('banner');
+    }
     match /verseGroups/{id} {
       allow get, list: if true;
       allow create: if okVerseGroup();
@@ -405,9 +367,13 @@ service cloud.firestore {
       allow delete: if true;
     }
 
-    // ---------------------------------------------------------------
-    // 22. LOREVIA VERSE: AKUN ARTIS (data profil; email login ada di verseStaff)
-    // ---------------------------------------------------------------
+    // =====================================================================
+    // V02 VERSE: AKUN ARTIS (termasuk achievement tambahan)
+    // =====================================================================
+    function okVerseArtist() {
+      return base() && has('name') && str('name', 100) && body().name.size() > 0 && str('groupId', 80) && str('bio', 500)
+          && str('staffVer', 40) && str('emailHint', 80) && pic('photo') && arr('achv', 20);
+    }
     match /verseArtists/{id} {
       allow get, list: if true;
       allow create: if okVerseArtist();
@@ -415,9 +381,16 @@ service cloud.firestore {
       allow delete: if true;
     }
 
-    // ---------------------------------------------------------------
-    // 23. LOREVIA VERSE: POSTINGAN (foto carousel maks 10, link Spotify, eksklusif maks Rp10.000)
-    // ---------------------------------------------------------------
+    // =====================================================================
+    // V03 VERSE: POSTINGAN ARTIS/GRUP (musik, eksklusif)
+    // =====================================================================
+    function okVersePost() {
+      return base() && str('text', 3000) && arr('photos', 10) && str('groupId', 80) && str('authorId', 80)
+          && (!has('authorType') || body().authorType in ['group', 'artist'])
+          && flag('exclusive') && (!has('spotify') || body().spotify == null || body().spotify is map)
+          && (!has('price') || (body().price is number && body().price >= 0 && body().price <= 10000))
+          && num('likes') && num('ts');
+    }
     match /versePosts/{id} {
       allow get, list: if true;
       allow create: if okVersePost();
@@ -425,9 +398,12 @@ service cloud.firestore {
       allow delete: if true;
     }
 
-    // ---------------------------------------------------------------
-    // 24. LOREVIA VERSE: STORY ARTIS (24 jam)
-    // ---------------------------------------------------------------
+    // =====================================================================
+    // V04 VERSE: STORY ARTIS
+    // =====================================================================
+    function okVerseStory() {
+      return base() && str('artistId', 80) && str('groupId', 80) && str('text', 300) && pic('photo') && num('ts');
+    }
     match /verseStories/{id} {
       allow get, list: if true;
       allow create: if okVerseStory();
@@ -435,9 +411,13 @@ service cloud.firestore {
       allow delete: if true;
     }
 
-    // ---------------------------------------------------------------
-    // 25. LOREVIA VERSE: PEMBAYARAN KONTEN EKSKLUSIF
-    // ---------------------------------------------------------------
+    // =====================================================================
+    // V05 VERSE: PEMBAYARAN KONTEN EKSKLUSIF
+    // =====================================================================
+    function okVerseUnlock() {
+      return base() && str('postId', 80) && str('buyer', 100) && str('contact', 200) && str('code', 12)
+          && (!has('status') || body().status in ['pending', 'paid']) && num('ts');
+    }
     match /verseUnlocks/{id} {
       allow get, list: if true;
       allow create: if okVerseUnlock();
@@ -445,9 +425,12 @@ service cloud.firestore {
       allow delete: if true;
     }
 
-    // ---------------------------------------------------------------
-    // 26. LOREVIA VERSE: PERAN ARTIS/GRUP (email Google -> akun; admin yang menulis)
-    // ---------------------------------------------------------------
+    // =====================================================================
+    // V06 VERSE: PERAN ARTIS/GRUP (email -> akun)
+    // =====================================================================
+    function okStaff() {
+      return small() && has('kind') && body().kind in ['artist', 'group'] && str('refId', 80) && str('groupId', 80) && has('ver') && str('ver', 40) && num('ts');
+    }
     match /verseStaff/{email} {
       allow get: if true;
       allow list: if false;
@@ -456,9 +439,14 @@ service cloud.firestore {
       allow delete: if true;
     }
 
-    // ---------------------------------------------------------------
-    // 27. LOREVIA VERSE: PROFIL PENGGUNA (nama panggilan; hanya pemilik akun Google)
-    // ---------------------------------------------------------------
+    // =====================================================================
+    // V07 VERSE: PROFIL PENGGUNA
+    // =====================================================================
+    function okProfile() {
+      return small() && str('nickname', 40) && str('uid', 128) && str('bio', 300) && str('photo', 120000) && str('av', 14000)
+          && str('cover', 250000) && arr('unfollow', 300) && arr('follow', 300) && num('joined') && num('ts')
+          && str('username', 20) && str('ph', 100) && str('ps', 60);
+    }
     match /verseProfiles/{uid} {
       allow get: if request.auth != null && request.auth.uid == uid;
       allow list: if false;
@@ -466,9 +454,15 @@ service cloud.firestore {
       allow delete: if request.auth != null && request.auth.uid == uid;
     }
 
-    // ---------------------------------------------------------------
-    // 27b. LOREVIA VERSE: POSTINGAN PENGGEMAR (siapa pun boleh membaca; hanya pemilik yang membuat/mengubah/menghapus; suka boleh oleh semua)
-    // ---------------------------------------------------------------
+    // =====================================================================
+    // V08 VERSE: POSTINGAN PENGGEMAR
+    // =====================================================================
+    // postingan penggemar (foto + Spotify) di komunitas
+    function okFanPost() {
+      return small() && request.auth != null && body().uid == request.auth.uid
+          && str('name', 60) && str('av', 14000) && str('groupId', 80) && str('text', 2000) && arr('photos', 4)
+          && (!has('spotify') || body().spotify == null || body().spotify is map) && num('likes') && num('ts');
+    }
     match /verseFanPosts/{id} {
       allow get, list: if true;
       allow create: if okFanPost();
@@ -477,9 +471,9 @@ service cloud.firestore {
       allow delete: if request.auth != null && resource.data.uid == request.auth.uid;
     }
 
-    // ---------------------------------------------------------------
-    // 27c. LOREVIA VERSE: USERNAME UNIK (dibuat sekali oleh pendaftar; tidak bisa diubah/diambil orang lain)
-    // ---------------------------------------------------------------
+    // =====================================================================
+    // V09 VERSE: USERNAME UNIK
+    // =====================================================================
     match /verseUsernames/{name} {
       allow get: if request.auth != null;
       allow list: if false;
@@ -489,20 +483,32 @@ service cloud.firestore {
       allow delete: if request.auth != null && resource.data.uid == request.auth.uid;
     }
 
-    // ---------------------------------------------------------------
-    // 27d. LOREVIA VERSE: LANGGANAN CHAT & CALL (Rp10.000 / 30 hari; nama + jumlah bayar bisa dibaca publik untuk Billboard)
-    // ---------------------------------------------------------------
+    // =====================================================================
+    // V10 VERSE: LANGGANAN CHAT & CALL (ditulis server saat bayar terdeteksi)
+    // =====================================================================
+    function nowMs() { return request.time.toMillis(); }
+    function subActive(chatId) {
+      return exists(/databases/$(database)/documents/verseSubs/$(chatId))
+          && get(/databases/$(database)/documents/verseSubs/$(chatId)).data.end > nowMs();
+    }
+    // Dokumen langganan HANYA ditulis oleh server (api/pay-webhook.js, memakai service account yang melewati aturan ini)
+    // setelah pembayaran QRIS terverifikasi. Aplikasi/klien tidak boleh membuat atau mengubahnya.
     match /verseSubs/{id} {
       allow get, list: if true;
-      allow create: if okSubDoc(id) && body().n == 1 && body().end <= nowMs() + 2678400000 + 120000;
-      allow update: if okSubDoc(id) && resource.data.uid == request.auth.uid && body().n == resource.data.n + 1
-          && body().end <= (resource.data.end > nowMs() ? resource.data.end : nowMs()) + 2678400000 + 120000;
-      allow delete: if false;
+      allow create, update, delete: if false;
     }
 
-    // ---------------------------------------------------------------
-    // 27e. LOREVIA VERSE: PESAN CHAT (hanya penggemar bersangkutan & artisnya; penggemar wajib langganan aktif)
-    // ---------------------------------------------------------------
+    // =====================================================================
+    // V11 VERSE: PESAN CHAT
+    // =====================================================================
+    function okMsg() {
+      return small() && request.auth != null
+          && body().fanUid is string && body().artistId is string && body().chatId == body().fanUid + '_' + body().artistId
+          && body().text is string && body().text.size() >= 1 && body().text.size() <= 1000
+          && body().role in ['fan', 'artist'] && str('name', 60) && str('groupId', 80) && num('ts')
+          && ((body().role == 'fan' && body().fanUid == request.auth.uid && body().uid == request.auth.uid && subActive(body().chatId))
+              || (body().role == 'artist' && body().uid == request.auth.uid && isStaffFor(body().artistId)));
+    }
     match /verseMsgs/{id} {
       allow get, list: if request.auth != null && (resource.data.fanUid == request.auth.uid || isStaffFor(resource.data.artistId));
       allow create: if okMsg();
@@ -510,9 +516,17 @@ service cloud.firestore {
       allow delete: if request.auth != null && resource.data.uid == request.auth.uid;
     }
 
-    // ---------------------------------------------------------------
-    // 27f. LOREVIA VERSE: PANGGILAN SUARA (sinyal WebRTC; hanya penggemar & artis terkait)
-    // ---------------------------------------------------------------
+    // =====================================================================
+    // V12 VERSE: PANGGILAN SUARA (sinyal WebRTC)
+    // =====================================================================
+    function callParty(d) {
+      return request.auth != null && (d.fanUid == request.auth.uid || isStaffFor(d.artistId));
+    }
+    function okCallDoc(id) {
+      return small() && body().fanUid is string && body().artistId is string && id == body().fanUid + '_' + body().artistId && body().chatId == id
+          && body().state in ['ringing', 'active', 'declined', 'ended']
+          && str('name', 60) && str('groupId', 80) && str('offer', 30000) && str('answer', 30000) && num('ts');
+    }
     match /verseCalls/{id} {
       allow get, list: if callParty(resource.data);
       allow create: if request.auth != null && okCallDoc(id) && request.resource.data.fanUid == request.auth.uid && body().state == 'ringing' && subActive(id);
@@ -521,9 +535,15 @@ service cloud.firestore {
       allow delete: if callParty(resource.data);
     }
 
-    // ---------------------------------------------------------------
-    // 28. LOREVIA VERSE: SURAT PENGGEMAR UNTUK IDOL (hanya pengirim & artis/grup penerima)
-    // ---------------------------------------------------------------
+    // =====================================================================
+    // V13 VERSE: SURAT UNTUK IDOL
+    // =====================================================================
+    function okLetter() {
+      return small() && request.auth != null && body().fromUid == request.auth.uid
+          && body().text is string && body().text.size() >= 5 && body().text.size() <= 1000
+          && body().toArtistId is string && body().toArtistId.size() <= 80
+          && str('fromName', 60) && str('toName', 100) && str('groupId', 80) && num('ts');
+    }
     match /verseLetters/{id} {
       allow get, list: if request.auth != null
           && (resource.data.fromUid == request.auth.uid || isStaffFor(resource.data.toArtistId));
@@ -532,9 +552,13 @@ service cloud.firestore {
       allow delete: if request.auth != null && resource.data.fromUid == request.auth.uid;
     }
 
-    // ---------------------------------------------------------------
-    // 29. LOREVIA VERSE: EVENT VOTE
-    // ---------------------------------------------------------------
+    // =====================================================================
+    // V14 VERSE: EVENT VOTE
+    // =====================================================================
+    function okVerseEvent() {
+      return base() && str('title', 150) && str('desc', 500) && num('end') && num('ts') && arr('candidates', 30)
+          && (!has('status') || body().status in ['open', 'closed']);
+    }
     match /verseEvents/{id} {
       allow get, list: if true;
       allow create: if okVerseEvent();
@@ -542,9 +566,17 @@ service cloud.firestore {
       allow delete: if true;
     }
 
-    // ---------------------------------------------------------------
-    // 30. LOREVIA VERSE: SUARA VOTE (1 akun Google = 1 suara per event; tidak bisa diubah)
-    // ---------------------------------------------------------------
+    // =====================================================================
+    // V15 VERSE: SUARA VOTE
+    // =====================================================================
+    function okVote(id) {
+      return request.auth != null && body().uid == request.auth.uid && has('eventId') && body().eventId is string
+          && id == body().eventId + '_' + request.auth.uid
+          && body().keys().hasOnly(['eventId', 'uid', 'artistId', 'ts'])
+          && exists(/databases/$(database)/documents/verseEvents/$(body().eventId))
+          && get(/databases/$(database)/documents/verseEvents/$(body().eventId)).data.get('status', '') == 'open'
+          && body().artistId in get(/databases/$(database)/documents/verseEvents/$(body().eventId)).data.get('candidates', []);
+    }
     match /verseVotes/{id} {
       allow get, list: if true;
       allow create: if okVote(id);
@@ -552,9 +584,31 @@ service cloud.firestore {
       allow delete: if !exists(/databases/$(database)/documents/verseEvents/$(resource.data.eventId));
     }
 
-    // ---------------------------------------------------------------
-    // 31. PENGATURAN UMUM (cadangan, tidak boleh dihapus)
-    // ---------------------------------------------------------------
+    // =====================================================================
+    // V16 VERSE: BANNER IKLAN BERANDA (foto landscape, diatur dari Dasbor Admin)
+    // =====================================================================
+    function okVerseBanner() {
+      return base() && str('id', 80) && pic('img') && str('title', 80) && str('link', 300) && flag('on') && num('order') && num('ts');
+    }
+    match /verseBanners/{id} {
+      allow get, list: if true;
+      allow create: if okVerseBanner();
+      allow update: if okVerseBanner();
+      allow delete: if true;
+    }
+
+    // =====================================================================
+    // V17 VERSE: TAGIHAN PEMBAYARAN (dibuat & dilunasi oleh server; pemilik hanya boleh membaca tagihannya sendiri)
+    // =====================================================================
+    match /verseOrders/{id} {
+      allow get: if request.auth != null && resource.data.uid == request.auth.uid;
+      allow list: if false;
+      allow create, update, delete: if false;
+    }
+
+    // =====================================================================
+    // S01 PENGATURAN UMUM
+    // =====================================================================
     match /settings/{id} {
       allow get, list: if true;
       allow create: if small();
@@ -562,9 +616,9 @@ service cloud.firestore {
       allow delete: if false;
     }
 
-    // ---------------------------------------------------------------
-    // SELAIN YANG DI ATAS: DITOLAK
-    // ---------------------------------------------------------------
+    // =====================================================================
+    // PENUTUP: SEMUA KOLEKSI LAIN DITOLAK
+    // =====================================================================
     match /{document=**} {
       allow read, write: if false;
     }
