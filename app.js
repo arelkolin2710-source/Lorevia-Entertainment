@@ -5611,11 +5611,6 @@ async function vsPollMsgs() {
         if (key === VSM.lastKey) return; VSM.lastKey = key; VSM.msgs = rows; vsPaintMsgs();
     } catch (e) { console.warn('[Verse] chat:', e); const el = $id('vsMsgs'); if (el && !VSM.msgs.length) el.innerHTML = '<p class="vs-empty">Pesan belum bisa dimuat. Pastikan Rules Firestore terbaru sudah dipublikasikan.</p>'; }
 }
-function vsMsgHtml(m) {
-    const mine = staffSide() ? m.role === 'artist' : m.role === 'fan';
-    return `<div class="vs-msg ${mine ? 'me' : ''}"><div class="vs-bub">${escHtml(m.text)}</div><small>${new Date(m.ts).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })}</small></div>`;
-    function staffSide() { return !!vsSession(); }
-}
 function vsPaintMsgs() {
     const el = $id('vsMsgs'); if (!el) return; const near = el.scrollHeight - el.scrollTop - el.clientHeight < 80 || !el.childElementCount;
     el.innerHTML = VSM.msgs.length ? VSM.msgs.map(vsMsgHtml).join('') : '<p class="vs-empty">Belum ada pesan. Sapa idolmu dulu ♡</p>';
@@ -5633,16 +5628,6 @@ async function vsSendMsg() {
     VSM.busy = false;
 }
 function vsLvLineHtml() { return VAUTH.user ? `<section class="vs-card vs-glass">${vsLvLine()}</section>` : ''; }
-function vsChatHtml() {
-    const a = vsArtist(VSM.aid), staff = vsSession(); if (!a) return vsChatsHtml();
-    const on = staff || vsSubActive(a.id), s = vsMySub(a.id);
-    setTimeout(vsPaintMsgs, 0);
-    return `<div class="vs-chat"><div class="vs-chat-h vs-glass"><button type="button" class="vs-round bub" data-drag onclick="vsChatStop(); vsTab('chats')" aria-label="Kembali">${VS_ICON.back}</button>${vsAv(a.photo, a.name, 'sm', vsArtistLv(a.id))}<div><b>${escHtml(a.name)}${VS_VF}</b><small>${on ? (s ? 'Langganan sampai ' + vsDate(s.end) : 'Online') : 'Langganan berakhir'}</small></div>
-        <button type="button" class="vs-round bub call" data-drag onclick="vsCallStart('${a.id}')" aria-label="Telepon">${VS_ICON.phone}</button></div>
-        <div class="vs-msgs" id="vsMsgs"></div>
-        ${on ? `<div class="vs-msgin vs-glass"><input id="vsMsgIn" maxlength="1000" placeholder="Tulis pesan untuk ${escHtml(a.name)}…" onkeydown="if(event.key==='Enter')vsSendMsg()"><button type="button" class="vs-send" onclick="vsSendMsg()" aria-label="Kirim">${VS_ICON.send}</button></div>`
-            : `<div class="vs-msgin vs-glass"><button type="button" class="vs-pill" onclick="vsSubOpen('${a.id}')">Perpanjang langganan ${vsRp(VS_SUB_PRICE)}</button></div>`}</div>`;
-}
 // ---------- sisi artis: kotak masuk chat ----------
 async function vsLoadInbox(aid) {
     try {
@@ -5899,7 +5884,7 @@ async function vsAudPlay(i) {
     const l = vsAudios(), t = l[i]; if (!t) return;
     const a = vsAudInit();
     if (VSA.i === i && a.src) { if (a.paused) { try { await a.play(); } catch (e) {} } else a.pause(); return; }
-    VSA.i = i; VSA.sel = i; VSA.loading = true; if (VS.tab === 'music' && VSA.mode === 'list') renderView(); else vsAudSync();
+    VSA.i = i; VSA.sel = i; VSA.loading = true; if (VS.tab === 'music') renderView(); else vsAudSync();
     if (VS.curMc && VS.curMc._c) { try { VS.curMc._c.pause(); } catch (e) {} }
     try { const u = await mediaUrl(t); if (VSA.i !== i) return; a.src = u; await a.play(); }
     catch (e) { VSA.loading = false; vsAudSync(); if (e && e.name !== 'AbortError') alert('Audio tidak bisa diputar: ' + (e.message || e)); }
@@ -5914,27 +5899,13 @@ function vsAudSync() {
         const k = el.dataset.aud;
         if (k === 'root') { el.classList.toggle('playing', playing); el.classList.toggle('loading', VSA.loading); }
         else if (k === 'bar') el.style.setProperty('--p', pct + '%');
+        else if (k === 'ring') el.style.strokeDasharray = pct + ' 100';
         else if (k === 'cur') el.textContent = vsFmt(a && a.currentTime);
         else if (k === 'dur') el.textContent = vsFmt(a && a.duration);
         else if (k === 'title' && t) el.textContent = t.title || 'Tanpa judul';
         else if (k === 'artist' && t) el.textContent = t.artist || 'Lorevia Music';
     });
 }
-function vsShelfGo(i) { const s = document.querySelector('.vs-shelf'); if (!s) return; const c = s.children[i]; if (c) s.scrollTo({ left: c.offsetLeft - (s.clientWidth - c.clientWidth) / 2, behavior: 'smooth' }); }
-function vsShelfScroll(s) {
-    const mid = s.scrollLeft + s.clientWidth / 2; let best = 0, bd = 1e9;
-    Array.from(s.children).forEach((c, i) => { const d = Math.abs(c.offsetLeft + c.clientWidth / 2 - mid); if (d < bd) { bd = d; best = i; } });
-    clearTimeout(s._t); s._t = setTimeout(() => { if (best !== VSA.sel || (VSA.i >= 0 && best !== VSA.i && VSA.el && !VSA.el.paused)) { const was = VSA.el && !VSA.el.paused; VSA.sel = best; if (was && best !== VSA.i) vsAudPlay(best); vsShelfMark(); } }, 120);
-    Array.from(s.children).forEach((c, i) => c.classList.toggle('on', i === best));
-    document.querySelectorAll('.vs-blob i').forEach((d, i) => d.classList.toggle('on', i === best));
-    const t = vsAudios()[best]; if (t) { const h = $id('vsShT'), a = $id('vsShA'); if (h) h.textContent = t.title || 'Tanpa judul'; if (a) a.textContent = t.artist || 'Lorevia Music'; }
-}
-function vsShelfMark() { document.querySelectorAll('.vs-sv').forEach(el => el.classList.toggle('sel', +el.dataset.i === VSA.sel)); }
-function vsShelfTap(i) { VSA.sel = i; const s = document.querySelector('.vs-shelf'); const on = s && s.children[i] && s.children[i].classList.contains('on'); if (on) vsAudPlay(i); else vsShelfGo(i); }
-function vsSleeve(t, i) {
-    return `<button type="button" class="vs-sv" data-i="${i}" onclick="vsShelfTap(${i})"><span class="vs-sv-disc"><i><b></b></i></span><span class="vs-sv-sl">${t.cover ? `<img src="${escHtml(t.cover)}" alt="">` : `<em>${VS_ICON.note}</em>`}<u></u></span></button>`;
-}
-function vsShSel() { return VSA.sel; }
 // ---------- Langganan: pembayaran terdeteksi OTOMATIS (tanpa tombol "sudah bayar") ----------
 const VSQ = { aid: '', t0: 0, exp: 0, timer: null, poll: null, order: '' };
 function vsSubStop() { clearInterval(VSQ.timer); clearInterval(VSQ.poll); VSQ.timer = VSQ.poll = null; VSQ.order = ''; }
@@ -6010,13 +5981,12 @@ function renderView_verse() {
             <div class="vs-top-r"><button type="button" class="vs-round bub" data-drag onclick="vsTab('artists'); setTimeout(function(){var q=document.getElementById('vsQ'); q && q.focus();}, 60)" aria-label="Cari">${VS_ICON.search}</button>
             <button type="button" class="vs-round bub" data-drag onclick="vsTab('notif')" aria-label="Notifikasi">${VS_ICON.bell}${unread ? '<i class="vs-dot"></i>' : ''}</button></div></div>` : ''}
         <main class="vs-main ${showTop ? '' : 'notop'}">${body}</main>
-        ${VS.tab === 'music' && VSA.mode !== 'list' ? '' : vsMiniHtml()}
-        <nav class="vs-nav glass3d" style="--n:${VS_NAV.length};--i:${prev}"><i class="vs-nb-bub"></i>${VS_NAV.map(nb).join('')}</nav></div>`;
+        ${(VS.tab === 'music' && VSA.mode === 'now') || VS.tab === 'chat' ? '' : vsMiniHtml()}
+        ${VS.tab === 'chat' && VSM.aid ? '' : `<nav class="vs-nav glass3d" style="--n:${VS_NAV.length};--i:${prev}"><i class="vs-nb-bub"></i>${VS_NAV.map(nb).join('')}</nav>`}</div>`;
     const el = document.querySelector('.vs'); if (el && st) el.scrollTop = st;
     if (prev !== cur) requestAnimationFrame(() => requestAnimationFrame(() => { const n = document.querySelector('.vs-nav'); if (n) n.style.setProperty('--i', cur); }));
     else { const n = document.querySelector('.vs-nav'); if (n) n.style.setProperty('--i', cur); }
     vsBubbles(); vsAdStart(); vsAudSync();
-    if (VS.tab === 'music') requestAnimationFrame(() => requestAnimationFrame(() => { const sh = document.querySelector('.vs-shelf'); if (sh) { const c = sh.children[VSA.i >= 0 ? VSA.i : VSA.sel]; if (c) sh.scrollLeft = c.offsetLeft - (sh.clientWidth - c.clientWidth) / 2; vsShelfScroll(sh); vsAudSync(); } }));
 }
 
 // =====================================================================
@@ -6127,40 +6097,8 @@ function vsAudNext(d, auto) {
     const l = vsAudios(); if (!l.length) return; const from = VSA.i < 0 ? VSA.sel : VSA.i; let n;
     if (auto && VSA.rep) n = from; else if (VSA.shuf && l.length > 1) { do { n = Math.floor(Math.random() * l.length); } while (n === from); } else n = (from + d + l.length) % l.length;
     if (n === from && VSA.el) { VSA.el.currentTime = 0; VSA.el.play().catch(() => {}); } else vsAudPlay(n);
-    if (VS.tab === 'music' && VSA.mode !== 'list') vsShelfGo(n);
 }
-function vsMode(m) { VSA.mode = m; renderView(); }
 function vsToggle(k) { VSA[k] = !VSA[k]; if (k === 'rep' && VSA.el) VSA.el.loop = false; document.querySelectorAll('[data-t="' + k + '"]').forEach(b => b.classList.toggle('on', VSA[k])); }
-function vsMiniHtml() {
-    const t = vsAudios()[VSA.i]; if (!t) return '';
-    return `<div class="vs-mini" data-aud="root"><button type="button" class="vs-mini-in" onclick="vsMode('now'); vsTab('music')"><span class="vs-mini-art">${t.cover ? `<img src="${escHtml(t.cover)}" alt="">` : VS_ICON.note}</span><span class="vs-mini-t"><b data-aud="title">${escHtml(t.title || 'Tanpa judul')}</b><small data-aud="artist">${escHtml(t.artist || 'Lorevia Music')}</small></span></button>
-        <button type="button" class="vs-mini-b" onclick="vsAudPlay(${VSA.i})" aria-label="Putar/jeda"><svg class="pl" viewBox="0 0 24 24" width="22" height="22"><path fill="currentColor" d="M8 5v14l11-7z"/></svg><svg class="pa" viewBox="0 0 24 24" width="22" height="22"><path fill="currentColor" d="M6 5h4v14H6zm8 0h4v14h-4z"/></svg></button>
-        <button type="button" class="vs-mini-b" onclick="vsAudNext(1)" aria-label="Berikutnya"><svg viewBox="0 0 24 24" width="20" height="20"><path fill="currentColor" d="M6 6l9 6-9 6zM17 6h2v12h-2z"/></svg></button><i class="vs-mini-bar" data-aud="bar"></i></div>`;
-}
-function vsMusicHtml() {
-    const l = vsAudios();
-    if (!l.length) return vsSubHead('Lorevia Music', "vsTab('home')") + '<p class="vs-empty">Belum ada musik. Admin dapat mengunggah audio di Dasbor Admin &rarr; Audio Playlist.</p>';
-    if (VSA.sel >= l.length) VSA.sel = 0; const sel = VSA.i >= 0 ? VSA.i : VSA.sel, cur = l[sel] || l[0], mode = VSA.mode || 'now';
-    const seg = `<div class="vs-seg"><button type="button" class="${mode === 'now' ? 'on' : ''}" onclick="vsMode('now')">Now Playing</button><button type="button" class="${mode === 'list' ? 'on' : ''}" onclick="vsMode('list')">Daftar lagu</button><i style="transform:translateX(${mode === 'now' ? 0 : 100}%)"></i></div>`;
-    if (mode === 'list') {
-        return `${vsSubHead('Lorevia Music', "vsTab('home')")}${seg}<div class="vs-alb"><span class="vs-alb-c">${cur.cover ? `<img src="${escHtml(cur.cover)}" alt="">` : VS_ICON.note}</span><div><small>Album · ${l.length} lagu</small><h2>Lorevia Music</h2><em>${escHtml(cur.artist || 'Lorevia')}</em></div></div>
-            <div class="vs-alb-b"><button type="button" class="vs-btn" onclick="VSA.shuf=false; vsAudPlay(0)">&#9654; Putar</button><button type="button" class="vs-btn ghost" onclick="VSA.shuf=true; vsAudPlay(Math.floor(Math.random()*${l.length}))">&#8645; Acak</button></div>
-            <div class="vs-tl nm">${l.map((t, i) => `<button type="button" class="vs-trk ${i === VSA.i ? 'on' : ''}" onclick="vsAudPlay(${i})"><span class="vs-trn">${i === VSA.i ? '<i class="vs-eqm"><u></u><u></u><u></u></i>' : String(i + 1).padStart(2, '0')}</span><div><b>${escHtml(t.title || 'Tanpa judul')}</b><small>${escHtml(t.artist || 'Lorevia Music')}</small></div></button>`).join('')}</div>`;
-    }
-    setTimeout(() => { const s = document.querySelector('.vs-shelf'); if (s) { const c = s.children[sel]; if (c) s.scrollLeft = c.offsetLeft - (s.clientWidth - c.clientWidth) / 2; vsShelfScroll(s); vsAudSync(); } }, 30);
-    const ic = (p, w) => `<svg viewBox="0 0 24 24" width="${w || 24}" height="${w || 24}"><path fill="currentColor" d="${p}"/></svg>`;
-    return `${vsSubHead('Now Playing', "vsTab('home')")}${seg}<div class="vs-music" data-aud="root">
-        <div class="vs-shelf" onscroll="vsShelfScroll(this)">${l.map(vsSleeve).join('')}</div>
-        <div class="vs-blob">${l.map((_, i) => `<i class="${i === sel ? 'on' : ''}"></i>`).join('')}</div>
-        <div class="vs-mt"><div><h3 id="vsShT">${escHtml(cur.title || 'Tanpa judul')}</h3><p id="vsShA">${escHtml(cur.artist || 'Lorevia Music')}</p></div></div>
-        <div class="vs-wave" data-aud="bar" onclick="vsAudSeek(event,this)"><div class="bg">${vsWave(cur.title)}</div><div class="fg">${vsWave(cur.title)}</div></div>
-        <div class="vs-prog"><span data-aud="cur">0:00</span><span data-aud="dur">0:00</span></div>
-        <div class="vs-ctl"><button type="button" data-t="shuf" class="sm ${VSA.shuf ? 'on' : ''}" onclick="vsToggle('shuf')" aria-label="Acak">${ic('M17 3h4v4h-2V6.400l-4.200 4.200-1.400-1.400L17.600 5H17zM3 5h4.500l9 11H21v2h-5.500L6.500 7H3zM3 17h3.500l2.300-2.800 1.300 1.600L7.500 19H3zm14.600-3.500L21 17v2h-4v-1.700l-1.400-1.400z', 22)}</button>
-            <button type="button" onclick="vsAudNext(-1)" aria-label="Sebelumnya">${ic('M18 6l-9 6 9 6zM5 6h2v12H5z')}</button>
-            <button type="button" class="big" onclick="vsAudPlay(vsShSel())" aria-label="Putar/jeda"><svg class="pl" viewBox="0 0 24 24" width="30" height="30"><path fill="currentColor" d="M8 5v14l11-7z"/></svg><svg class="pa" viewBox="0 0 24 24" width="30" height="30"><path fill="currentColor" d="M6 5h4v14H6zm8 0h4v14h-4z"/></svg></button>
-            <button type="button" onclick="vsAudNext(1)" aria-label="Berikutnya">${ic('M6 6l9 6-9 6zM17 6h2v12h-2z')}</button>
-            <button type="button" data-t="rep" class="sm ${VSA.rep ? 'on' : ''}" onclick="vsToggle('rep')" aria-label="Ulang">${ic('M7 7h10v3l4-4-4-4v3H5v6h2zm10 10H7v-3l-4 4 4 4v-3h12v-6h-2z', 22)}</button></div></div>`;
-}
 // ---------- Beranda & Chat bergaya baru ----------
 function vsHelloHtml() {
     const nm = VAUTH.user ? vsFanName() : 'Tamu';
@@ -6187,6 +6125,86 @@ function vsChatsHtml() {
         <h4 class="vs-h">Pesan</h4>
         ${act.length ? mine.filter(s => s.end > Date.now()).map(s => row(vsArtist(s.artistId), s)).join('') : '<p class="vs-empty" style="padding:12px">Belum ada langganan aktif.</p>'}
         ${others.length ? `<h4 class="vs-h">Artis lain</h4>${others.map(a => row(a, mine.find(s => s.artistId === a.id) || null)).join('')}` : ''}`;
+}
+
+// =====================================================================
+// V8 — Musik gaya "Listening now / Trending", chat bubble + keyboard HP, tema LinkedIn/Loop
+// =====================================================================
+function vsMode(m) { VSA.mode = m; renderView(); }
+function vsToggle(k) { VSA[k] = !VSA[k]; if (k === 'rep' && VSA.el) VSA.el.loop = false; document.querySelectorAll('[data-t="' + k + '"]').forEach(b => b.classList.toggle('on', VSA[k])); }
+function vsHist() { try { return JSON.parse(localStorage.getItem('lvHist') || '[]'); } catch (e) { return []; } }
+function vsHistAdd(t) { try { const k = String(t.id || t.title); const h = vsHist().filter(x => x !== k); h.unshift(k); localStorage.setItem('lvHist', JSON.stringify(h.slice(0, 12))); } catch (e) {} }
+function vsFavs() { try { return JSON.parse(localStorage.getItem('lvFav') || '[]'); } catch (e) { return []; } }
+function vsTKey(t) { return String(t.id || t.title); }
+function vsFavToggle(i) {
+    const t = vsAudios()[i]; if (!t) return; const k = vsTKey(t); let f = vsFavs(); f = f.includes(k) ? f.filter(x => x !== k) : f.concat(k);
+    try { localStorage.setItem('lvFav', JSON.stringify(f)); } catch (e) {}
+    document.querySelectorAll('[data-fav]').forEach(b => b.classList.toggle('on', f.includes(vsTKey(vsAudios()[VSA.i >= 0 ? VSA.i : VSA.sel] || {}))));
+}
+function vsShareTrack() {
+    const t = vsAudios()[VSA.i >= 0 ? VSA.i : VSA.sel]; if (!t) return; const txt = (t.title || 'Lagu') + ' — ' + (t.artist || 'Lorevia Music');
+    if (navigator.share) navigator.share({ title: txt, url: location.href.split('#')[0] }).catch(() => {}); else { try { navigator.clipboard.writeText(txt + ' ' + location.href.split('#')[0]); alert('Tautan disalin'); } catch (e) {} }
+}
+function vsPlayOpen(i) { VSA.mode = 'now'; VSA.sel = i; if (VSA.i === i) { renderView(); return; } vsAudPlay(i); const l = vsAudios(); if (l[i]) vsHistAdd(l[i]); renderView(); }
+function vsMiniHtml() {
+    const t = vsAudios()[VSA.i]; if (!t) return '';
+    return `<div class="vs-mini" data-aud="root"><button type="button" class="vs-mini-in" onclick="vsMode('now'); vsTab('music')"><span class="vs-mini-art">${t.cover ? `<img src="${escHtml(t.cover)}" alt="">` : VS_ICON.note}</span><span class="vs-mini-t"><b data-aud="title">${escHtml(t.title || 'Tanpa judul')}</b><small data-aud="artist">${escHtml(t.artist || 'Lorevia Music')}</small></span></button>
+        <button type="button" class="vs-mini-b" onclick="vsAudPlay(${VSA.i})" aria-label="Putar/jeda"><svg class="pl" viewBox="0 0 24 24" width="22" height="22"><path fill="currentColor" d="M8 5v14l11-7z"/></svg><svg class="pa" viewBox="0 0 24 24" width="22" height="22"><path fill="currentColor" d="M6 5h4v14H6zM14 5h4v14h-4z"/></svg></button>
+        <button type="button" class="vs-mini-b" onclick="vsAudNext(1)" aria-label="Berikutnya"><svg viewBox="0 0 24 24" width="20" height="20"><path fill="currentColor" d="M6 6l9 6-9 6zM17 6h2v12h-2z"/></svg></button><i class="vs-mini-bar" data-aud="bar"></i></div>`;
+}
+function vsMusicHtml() {
+    const l = vsAudios();
+    if (!l.length) return vsSubHead('Lorevia Music', "vsTab('home')") + '<p class="vs-empty">Belum ada musik. Admin dapat mengunggah audio di Dasbor Admin &rarr; Audio Playlist.</p>';
+    if (VSA.sel >= l.length) VSA.sel = 0;
+    const cov = t => t.cover ? `<img src="${escHtml(t.cover)}" alt="" loading="lazy">` : `<em>${VS_ICON.note}</em>`;
+    const ic = (p, w) => `<svg viewBox="0 0 24 24" width="${w || 24}" height="${w || 24}"><path fill="currentColor" d="${p}"/></svg>`;
+    const PL = '<svg class="pl" viewBox="0 0 24 24" width="28" height="28"><path fill="currentColor" d="M8 5v14l11-7z"/></svg><svg class="pa" viewBox="0 0 24 24" width="28" height="28"><path fill="currentColor" d="M6 5h4v14H6zM14 5h4v14h-4z"/></svg>';
+    if (VSA.mode === 'now') {
+        const i = VSA.i >= 0 ? VSA.i : VSA.sel, t = l[i] || l[0], nx = l[(i + 1) % l.length], fav = vsFavs().includes(vsTKey(t));
+        setTimeout(vsAudSync, 20);
+        return `<div class="vs-ln" data-aud="root"><div class="vs-ln-h"><button type="button" class="vs-round bub" onclick="vsMode('home')" aria-label="Kembali">${VS_ICON.back}</button><b>Listening now</b><span></span></div>
+          <div class="vs-ln-art"><svg class="vs-ring" viewBox="0 0 100 100" preserveAspectRatio="none"><rect class="bg" x="2" y="2" width="96" height="96" rx="22" pathLength="100"/><rect class="fg" data-aud="ring" x="2" y="2" width="96" height="96" rx="22" pathLength="100"/></svg><span class="vs-ln-c">${cov(t)}</span></div>
+          <div class="vs-ln-t"><div><h3 data-aud="title">${escHtml(t.title || 'Tanpa judul')}</h3><p data-aud="artist">${escHtml(t.artist || 'Lorevia Music')}</p></div>
+            <span><button type="button" data-fav class="vs-ib ${fav ? 'on' : ''}" onclick="vsFavToggle(${i})" aria-label="Suka">${VS_ICON.heart}</button><button type="button" class="vs-ib" onclick="vsShareTrack()" aria-label="Bagikan">${ic('M18 16a3 3 0 0 0-2.200 1L9 13.700a3 3 0 0 0 0-3.400L15.800 7A3 3 0 1 0 15 5a3 3 0 0 0 .1.800L8.200 9A3 3 0 1 0 8.200 15l6.900 3.300A3 3 0 1 0 18 16z', 20)}</button></span></div>
+          <div class="vs-wave" data-aud="bar" onclick="vsAudSeek(event,this)"><div class="bg">${vsWave(t.title)}</div><div class="fg">${vsWave(t.title)}</div></div>
+          <div class="vs-prog"><span data-aud="cur">0:00</span><span data-aud="dur">0:00</span></div>
+          <div class="vs-ctl"><button type="button" data-t="shuf" class="sm ${VSA.shuf ? 'on' : ''}" onclick="vsToggle('shuf')" aria-label="Acak">${ic('M17 3h4v4h-2V6.400l-4.200 4.200-1.400-1.400L17.600 5H17zM3 5h4.500l9 11H21v2h-5.500L6.500 7H3zM3 17h3.500l2.300-2.800 1.300 1.600L7.600 19H3z', 22)}</button>
+            <button type="button" onclick="vsAudNext(-1)" aria-label="Sebelumnya">${ic('M18 6l-9 6 9 6zM5 6h2v12H5z')}</button>
+            <button type="button" class="big" onclick="vsAudPlay(${i})" aria-label="Putar/jeda">${PL}</button>
+            <button type="button" onclick="vsAudNext(1)" aria-label="Berikutnya">${ic('M6 6l9 6-9 6zM17 6h2v12h-2z')}</button>
+            <button type="button" data-t="rep" class="sm ${VSA.rep ? 'on' : ''}" onclick="vsToggle('rep')" aria-label="Ulang">${ic('M7 7h10v3l4-4-4-4v3H5v6h2zm10 10H7v-3l-4 4 4 4v-3h12v-6h-2z', 22)}</button></div>
+          <div class="vs-nu"><small>Next up</small><button type="button" onclick="vsPlayOpen(${(i + 1) % l.length})"><span class="vs-nu-c">${cov(nx)}</span><span><b>${escHtml(nx.title || 'Tanpa judul')}</b><small>${escHtml(nx.artist || 'Lorevia Music')}</small></span>${VS_ICON.chev}</button></div></div>`;
+    }
+    const nm = VAUTH.user ? vsFanName() : 'Tamu', hist = vsHist();
+    let rec = hist.map(k => l.findIndex(t => vsTKey(t) === k)).filter(x => x >= 0); l.forEach((_, i) => { if (!rec.includes(i)) rec.push(i); }); rec = rec.slice(0, 4);
+    const trend = l.map((t, i) => i).sort((a, b) => ((l[b].plays || 0) - (l[a].plays || 0)) || (a - b)).slice(0, 8);
+    const week = l.slice(0, 12);
+    return `<div class="vs-mh"><div class="vs-mh-top"><div><h1>Hi, ${escHtml(nm)}!</h1><p>Let's listen to something cool today</p></div><button type="button" class="vs-round bub" onclick="vsTab('home')" aria-label="Beranda">${VS_ICON.back}</button></div>
+      <label class="vs-ms"><svg viewBox="0 0 24 24" width="18" height="18"><path fill="none" stroke="currentColor" stroke-width="2.200" stroke-linecap="round" d="M11 4a7 7 0 1 0 0 14 7 7 0 0 0 0-14zm9 16-4-4"/></svg><input type="search" placeholder="Cari lagu atau artis" oninput="vsSongFilter(this.value)"></label>
+      <h4 class="vs-mh-h">Recently played</h4>
+      <div class="vs-rec">${rec.map(i => `<button type="button" class="vs-rc ${i === VSA.i ? 'on' : ''}" onclick="vsPlayOpen(${i})"><span class="vs-rc-c">${cov(l[i])}</span><b>${escHtml(l[i].title || 'Tanpa judul')}</b></button>`).join('')}</div>
+      <h4 class="vs-mh-h">Trending now</h4>
+      <div class="vs-trend">${trend.map(i => `<button type="button" class="vs-tc ${i === VSA.i ? 'on' : ''}" onclick="vsPlayOpen(${i})"><span class="vs-tc-c">${cov(l[i])}<u>${ic('M8 5v14l11-7z', 22)}</u></span><b>${escHtml(l[i].title || 'Tanpa judul')}</b><small>${escHtml(l[i].artist || 'Lorevia Music')}</small></button>`).join('')}</div>
+      <h4 class="vs-mh-h">Songs of the week</h4>
+      <div class="vs-sw" id="vsSw">${week.map((t, i) => `<button type="button" class="vs-sr ${i === VSA.i ? 'on' : ''}" data-q="${escHtml(((t.title || '') + ' ' + (t.artist || '')).toLowerCase())}" onclick="vsPlayOpen(${i})"><span class="vs-sr-c">${cov(t)}</span><span class="vs-sr-t"><b>${escHtml(t.title || 'Tanpa judul')}</b><small>${escHtml(t.artist || 'Lorevia Music')}</small>${i === VSA.i ? '<i class="vs-sr-bar" data-aud="bar"></i>' : ''}</span><span class="vs-sr-p">${i === VSA.i ? '<i class="vs-eqm"><u></u><u></u><u></u></i>' : ic('M8 5v14l11-7z', 18)}</span></button>`).join('')}</div></div>`;
+}
+function vsSongFilter(q) { q = String(q || '').toLowerCase().trim(); document.querySelectorAll('#vsSw .vs-sr').forEach(b => { b.style.display = !q || b.dataset.q.includes(q) ? '' : 'none'; }); }
+// ---------- Chat bubble ----------
+function vsMsgHtml(m) {
+    const staff = !!vsSession(), mine = staff ? m.role === 'artist' : m.role === 'fan', a = vsArtist(VSM.aid) || {};
+    const who = m.role === 'artist' ? vsAv(a.photo, a.name, 'sm') : vsAv('', m.name || 'F', 'sm');
+    const tm = new Date(m.ts).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
+    return `<div class="vs-msg ${mine ? 'me' : ''}">${mine ? '' : `<span class="vs-mav">${who}</span>`}<div class="vs-mb"><div class="vs-bub">${escHtml(m.text)}</div><small>${tm}</small></div></div>`;
+}
+function vsChatHtml() {
+    const a = vsArtist(VSM.aid), staff = vsSession(); if (!a) return vsChatsHtml();
+    const on = staff || vsSubActive(a.id), s = vsMySub(a.id);
+    setTimeout(vsPaintMsgs, 0);
+    return `<div class="vs-chat v8"><div class="vs-chat-h"><button type="button" class="vs-round bub" data-drag onclick="vsChatStop(); vsTab('chats')" aria-label="Kembali">${VS_ICON.back}</button>${vsAv(a.photo, a.name, 'sm', vsArtistLv(a.id))}<div><b>${escHtml(a.name)}${VS_VF}</b><small>${on ? (s ? 'Langganan sampai ' + vsDate(s.end) : 'Online') : 'Langganan berakhir'}</small></div>
+        <button type="button" class="vs-round bub call" data-drag onclick="vsCallStart('${a.id}')" aria-label="Telepon">${VS_ICON.phone}</button></div>
+        <div class="vs-msgs" id="vsMsgs"></div>
+        ${on ? `<div class="vs-msgin"><input id="vsMsgIn" type="text" enterkeyhint="send" autocomplete="off" maxlength="1000" placeholder="Tulis pesan…" onkeydown="if(event.key==='Enter')vsSendMsg()"><button type="button" class="vs-send" onclick="vsSendMsg()" aria-label="Kirim">${VS_ICON.send}</button></div>`
+            : `<div class="vs-msgin"><button type="button" class="vs-pill" style="width:100%" onclick="vsSubOpen('${a.id}')">Perpanjang langganan ${vsRp(VS_SUB_PRICE)}</button></div>`}</div>`;
 }
 
 
